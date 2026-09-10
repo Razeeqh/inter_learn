@@ -276,6 +276,9 @@ function fractionAt(lines, i) {
   if (next.slice(0, first).trim()) return null;            // denominator must start under the bar
   const label = prev.slice(0, first).trim();               // e.g. a list marker beside the numerator
   if (label.length > 6) return null;
+  // a bracket left open means the formula is spread over more lines than these
+  const open = (l) => (l.match(/\(/g) || []).length - (l.match(/\)/g) || []).length;
+  if (open(prev) !== 0 || open(next) !== 0) return null;
 
   const parts = [];
   for (const [s, e] of runs) {
@@ -426,19 +429,41 @@ function splitRow(line) {
 
 const DIVIDER = '\u0001';
 
-/** Strip a +----+ / +====+ panel frame. Internal rules become section dividers. */
+/** Strip a +----+ / +====+ panel frame. Internal rules become section dividers.
+ *  Text may sit outside the frame, before or after it. */
 function unframe(lines) {
   const body = lines.filter((l) => l.trim() !== '');
   if (body.length < 3) return null;
   const edge = (l) => /^\s*\+[-=]+\+\s*$/.test(l);
-  if (!edge(body[0]) || !edge(body[body.length - 1])) return null;
 
-  const out = [];
-  for (const l of body.slice(1, -1)) {
-    if (edge(l)) { out.push(DIVIDER); continue; }
-    if (!/^\s*\|.*\|\s*$/.test(l)) return null;
-    out.push(l.replace(/^\s*\|/, '').replace(/\|\s*$/, ''));
+  const first = body.findIndex(edge);
+  if (first < 0) return null;
+  let last = -1;
+  for (let i = body.length - 1; i > first; i--) if (edge(body[i])) { last = i; break; }
+  if (last < 0) return null;
+
+  const outside = body.slice(0, first).concat(body.slice(last + 1));
+  // a caption may sit outside the panel; only a bar in the frame's own column, or
+  // another edge, means this is not a single panel
+  const edgeCol = body[first].indexOf('+');
+  if (outside.some((l) => l.indexOf('|') === edgeCol || /^\s*\+[-=]/.test(l) || /[-=]\+\s*$/.test(l))) {
+    return null;
   }
+
+  const out = body.slice(0, first);
+  let barred = 0;
+  for (const l of body.slice(first + 1, last)) {
+    if (edge(l)) { out.push(DIVIDER); continue; }
+    if (/^\s*\|/.test(l)) {
+      // the closing bar is often missing where a row runs to the frame edge
+      out.push(l.replace(/^\s*\|/, '').replace(/\|\s*$/, ''));
+      barred++;
+      continue;
+    }
+    out.push(l);                       // a heading sitting between two panels
+  }
+  if (barred < 2) return null;
+  out.push.apply(out, body.slice(last + 1));
   return out.length ? out : null;
 }
 
@@ -612,10 +637,6 @@ function renderBlock(code) {
     if (inner) { lines = inner; framed = true; }
   }
 
-  // by this point a +---+ run is only leftover decoration around a matrix; blank
-  // it out rather than print it, keeping the columns the parser relies on
-  lines = lines.map((l) => l.replace(/\+[-=]{2,}\+/g, (m) => ' '.repeat(m.length)));
-
   const rows = [];
   let i = 0;
   let sawStructure = false;
@@ -646,19 +667,32 @@ function renderBlock(code) {
       continue;
     }
 
+    // a bar we could not read as a fraction: keep the three lines as they were
+    // drawn rather than printing the bar as a row of dashes
+    if (/^[\s\-,()]*-{3,}[\s\-,()]*$/.test(lines[i + 1] || '')) {
+      const grp = [lines[i], lines[i + 1], lines[i + 2]].filter((l) => l !== undefined);
+      rows.push({ expr: typesetInline(grp.join('\n').replace(/\s+$/, '')), aligned: true });
+      i += 3;
+      continue;
+    }
+
     if (/^\s*(\+[-=+]+\+[ \t]*)+$/.test(line)) { i++; continue; }   // leftover frame
 
     // no pipe stripping here: unframe() has already removed any real frame, so a
     // remaining | is an absolute value bar such as |x| >= 0
+    // a +---+ run still on a line of text is decoration the parser could not
+    // use; blank it rather than print it, keeping the columns the rest relies on
+    const clean = line.replace(/\+[-=]{2,}\+/g, (m) => ' '.repeat(m.length));
+
     // a line with several wide gaps is a column layout (a balanced equation, a
     // reactants/products table); splitting it in two would lose the alignment
-    if (!line.includes('=') && (line.trim().match(/\s{3,}/g) || []).length >= 2) {
-      rows.push({ expr: typesetInline(line.replace(/\s+$/, '')), aligned: true });
+    if (!clean.includes('=') && (clean.trim().match(/\s{3,}/g) || []).length >= 2) {
+      rows.push({ expr: typesetInline(clean.replace(/\s+$/, '')), aligned: true });
       i++;
       continue;
     }
 
-    const { expr, note } = splitRow(line);
+    const { expr, note } = splitRow(clean);
     // a heading is all capitals with real words in it, and carries no note of its
     // own; "2 H2" is a formula, not a heading
     const caption = !note && !expr.includes('=') && !/[a-z]/.test(expr) &&
@@ -699,4 +733,4 @@ function renderBlock(code) {
   return '<div class="fsheet' + (hasNote ? '' : ' solo') + '">' + html + '</div>';
 }
 
-window.Typeset = { inline: typesetInline, block: renderBlock, esc };
+window.Typeset = { inline: typesetInline, block: renderBlock, esc, unframe };

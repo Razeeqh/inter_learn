@@ -19,6 +19,7 @@ const showAll = process.argv.includes('--all');
 
 const issues = {
   boxLeak: { desc: 'box drawing characters leaked into typeset output', hits: [] },
+  frameLeak: { desc: 'panel frame printed instead of being stripped', hits: [] },
   emptyExpr: { desc: 'row has a note but no formula', hits: [] },
   missedMath: { desc: 'left as monospace but looks like formulas', hits: [] },
   hugeNote: { desc: 'note column suspiciously long (bad split)', hits: [] },
@@ -82,6 +83,15 @@ for (const file of files) {
         const text = html.replace(/<[^>]+>/g, ' ');
         if (/\+--|--\+/.test(text)) {
           issues.boxLeak.hits.push({ rel, line: start, code });
+        }
+        // a panel whose frame the parser could not strip. Matrices also use
+        // +---+ and bars, but the parser turns those into real brackets.
+        const framed = buf.filter((l) => /^\s*\|.*\|\s*$/.test(l)).length >= 3 &&
+          buf.some((l) => /^\s*\+[-=]+\+\s*$/.test(l));
+        if (framed && !/class="mat"/.test(html) && !/expr wide algn/.test(html) &&
+            !T.unframe(buf.map((l) => l.replace(/\r/g, ''))) &&
+            (text.match(/\|/g) || []).length >= 3) {
+          issues.frameLeak.hits.push({ rel, line: start, code });
         }
         if (GREEK_WORDS.test(text) || RELATIONS.test(text)) {
           issues.rawSymbol.hits.push({ rel, line: start, code });
