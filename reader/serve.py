@@ -112,17 +112,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        parsed = urllib.parse.urlparse(self.path)
-        route = parsed.path
-        query = urllib.parse.parse_qs(parsed.query)
+        route = urllib.parse.urlparse(self.path).path
 
         try:
-            if route == "/api/tree":
+            if route == "/tree.json":
                 self._send(200, json.dumps(scan_tree()))
                 return
 
-            if route == "/api/doc":
-                rel = (query.get("path") or [""])[0]
+            if route.lower().endswith(".md"):
+                rel = urllib.parse.unquote(route.lstrip("/"))
                 target = safe_doc_path(rel)
                 if not target.is_file():
                     self._send(404, json.dumps({"error": "not found", "path": rel}))

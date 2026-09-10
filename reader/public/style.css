@@ -50,12 +50,13 @@ a:hover { text-decoration: underline; }
 .brand { font-weight: 750; letter-spacing: -.01em; color: var(--ink); white-space: nowrap; }
 .bar .spacer { flex: 1; }
 .bar input {
-  flex: 0 1 400px; font: inherit; font-size: 14px; padding: 7px 12px; color: var(--ink);
+  flex: 1 1 120px; min-width: 0; max-width: 420px;
+  font: inherit; font-size: 14px; padding: 7px 12px; color: var(--ink);
   background: var(--soft); border: 1px solid transparent; border-radius: 8px;
 }
 .bar input:focus { outline: none; border-color: var(--accent); background: var(--panel); }
 .icon {
-  font: inherit; font-size: 13px; min-width: 33px; padding: 6px 9px; cursor: pointer;
+  font: inherit; font-size: 13px; min-width: 33px; padding: 6px 9px; cursor: pointer; flex: none;
   color: var(--dim); background: transparent; border: 1px solid var(--line); border-radius: 8px;
 }
 .icon:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
@@ -141,6 +142,8 @@ a:hover { text-decoration: underline; }
 .doc hr { height: 1px; margin: 2.4em 0; border: 0; background: var(--line); }
 .doc strong { color: var(--ink); font-weight: 700; }
 .doc code { font-family: var(--code); font-size: .8em; padding: .13em .38em; background: var(--soft); border-radius: 5px; }
+/* maths written inline in a sentence, lifted out of a code span */
+.imath { font-family: var(--serif); font-size: 1.06em; color: var(--ink); }
 
 /* superscripts and subscripts, sized so they are unmistakable */
 .doc sup, .doc sub, .fsheet sup, .fsheet sub {
@@ -226,12 +229,16 @@ a:hover { text-decoration: underline; }
   white-space: pre-wrap; line-height: 1.75;
 }
 .fsheet .expr.wide { grid-column: 1 / -1; }
+.fsheet .expr.algn {
+  font-family: var(--code); font-size: .8em; line-height: 1.7;
+  white-space: pre; text-align: left; overflow-x: auto; justify-self: start;
+}
 .fsheet .note {
   font-family: var(--sans); font-size: 13.5px; color: var(--dim); line-height: 1.55;
 }
 .fsheet .cap {
   grid-column: 1 / -1; font-family: var(--sans); font-size: 13px; font-weight: 700;
-  letter-spacing: .06em; text-transform: uppercase; color: var(--accent);
+  letter-spacing: .06em; text-transform: uppercase; color: var(--accent); text-align: left;
   margin: .8em 0 .3em; padding-bottom: .45em; border-bottom: 2px solid var(--accent-soft);
 }
 .fsheet > .cap:first-child { margin-top: 0; }
@@ -246,8 +253,18 @@ pre.art {
   white-space: pre; -webkit-overflow-scrolling: touch;
 }
 
+/* shrink a diagram just enough to fit the column, rather than making it scroll */
+@supports (container-type: inline-size) {
+  .doc { container-type: inline-size; }
+  pre.art { font-size: max(9px, min(var(--mono), calc((100cqw - 40px) / (var(--cols, 60) * 0.605)))); }
+}
+
 /* ---------------- tables ---------------- */
 .tablewrap { overflow-x: auto; margin: 1.4em 0; border: 1px solid var(--line); border-radius: 10px; }
+.tnote {
+  margin: 0; padding: 10px 14px; font-family: var(--sans); font-size: 14px;
+  color: var(--dim); background: var(--soft);
+}
 .doc table { border-collapse: collapse; width: 100%; font-family: var(--sans); font-size: 14.5px; color: var(--ink-2); }
 .doc th, .doc td { padding: 9px 13px; border-bottom: 1px solid var(--line-soft); text-align: left; vertical-align: top; }
 .doc th { background: var(--soft); color: var(--ink); font-weight: 700; font-size: 13px; letter-spacing: .01em; }
@@ -303,6 +320,32 @@ pre.art {
 .anim .drift .d3 { animation-delay: -3s; }
 .anim .orbit     { transform-origin: 210px 90px; animation: spin 3.4s linear infinite; }
 
+.anim .bar-ke    { fill: var(--accent); transform-origin: 313px 140px; animation: keBar 1.6s ease-in-out infinite alternate; }
+.anim .pend      { transform-origin: 160px 20px; animation: swing 1.6s ease-in-out infinite alternate; }
+.anim .gas       { animation: gasFly 3.6s linear infinite; }
+.anim .gas.g2    { animation-duration: 2.9s; animation-delay: -1.1s; }
+.anim .gas.g3    { animation-duration: 4.3s; animation-delay: -2.2s; }
+.anim .gas.g4    { animation-duration: 3.2s; animation-delay: -0.6s; }
+.anim .ripple circle { fill: none; stroke: var(--accent); stroke-width: 2; animation: spread 1.8s linear infinite; }
+.anim .fringe    { fill: var(--accent); animation: glow 1.8s ease-in-out infinite; }
+.anim .fringe:nth-child(2) { animation-delay: -.45s; }
+.anim .fringe:nth-child(3) { animation-delay: -.9s; }
+.anim .fringe:nth-child(4) { animation-delay: -1.35s; }
+.anim .testq     { fill: var(--dim); offset-path: path("M210,85 L300,85"); animation: run 2.4s ease-in infinite; }
+.anim .lbl.pos   { fill: #fff; font-weight: 700; }
+.anim .magnet    { animation: nudge 2.4s ease-in-out infinite alternate; }
+.anim .needle    { transform-origin: 360px 80px; animation: flick 2.4s ease-in-out infinite alternate; }
+.anim .phas      { transform-origin: 80px 80px; animation: spin 2.2s linear infinite; }
+.anim .emrun     { animation: waveRun 2s linear infinite; }
+.anim .bfield    { opacity: .45; stroke-dasharray: 6 4; }
+.anim .ph        { fill: var(--accent); offset-path: path("M40,0 L236,0"); animation: run 1.8s linear infinite; }
+.anim .ph.p2     { animation-delay: -.9s; }
+.anim .e1, .anim .e2 { offset-path: path("M270,0 L400,0"); animation: run 1.8s linear infinite; }
+.anim .e1        { animation-delay: -.45s; }
+.anim .e2        { animation-delay: -1.35s; }
+.anim .jump      { offset-path: path("M180,14 L180,62"); animation: run 2.6s ease-in infinite; }
+.anim .photon    { animation: dashFlow .9s linear infinite; }
+
 @keyframes shmMove { from { transform: translateX(-38px); } to { transform: translateX(38px); } }
 @keyframes run     { from { offset-distance: 0%; } to { offset-distance: 100%; } }
 @keyframes waveRun { from { transform: translateX(0); } to { transform: translateX(120px); } }
@@ -310,6 +353,15 @@ pre.art {
 @keyframes dashFlow { to { stroke-dashoffset: -32; } }
 @keyframes driftRun { from { transform: translateX(46px); } to { transform: translateX(370px); } }
 @keyframes spin    { to { transform: rotate(360deg); } }
+@keyframes swing   { from { transform: rotate(-26deg); } to { transform: rotate(26deg); } }
+@keyframes keBar   { from { transform: scaleY(.12); } to { transform: scaleY(1); } }
+@keyframes gasFly  { 0% { transform: translate(0,0); } 25% { transform: translate(190px,58px); }
+                     50% { transform: translate(24px,74px); } 75% { transform: translate(176px,6px); }
+                     100% { transform: translate(0,0); } }
+@keyframes spread  { from { r: 6px; opacity: .85; } to { r: 120px; opacity: 0; } }
+@keyframes glow    { 0%,100% { opacity: 1; } 50% { opacity: .15; } }
+@keyframes nudge   { from { transform: translateX(0); } to { transform: translateX(74px); } }
+@keyframes flick   { from { transform: rotate(-32deg); } to { transform: rotate(32deg); } }
 
 .anim.paused * { animation-play-state: paused !important; }
 @media (prefers-reduced-motion: reduce) { .anim * { animation: none !important; } }

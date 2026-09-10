@@ -34,9 +34,12 @@ const OPS = [
   [/\binfinity\b/g, '∞'],
   [/\bangstrom\b/g, 'Å'],
   [/(\d)\s*degrees\b/g, '$1°'],
-  [/(\d)\s*deg\b/g, '$1°'],
-  // "m x n", "n1 x u1", "2 x 3". Both sides must be short tokens so ordinary
-  // prose such as "the x axis" is left alone.
+  [/(\d)\s*deg\b/g, '$1°']
+];
+
+// "m x n", "n1 x u1", "2 x 3". Both sides must be short tokens so ordinary
+// prose such as "the x axis" is left alone.
+const MUL = [
   [/\b([A-Za-z0-9]{1,3})\s+x\s+([A-Za-z0-9]{1,3})\b/g, '$1 × $2'],
   [/\b(\d)x(\d)\b/g, '$1 × $2'],
   [/(\))\s+x\s+(?=[A-Za-z0-9(])/g, '$1 × ']
@@ -70,11 +73,46 @@ function replaceCall(s, name, wrap) {
   return out + rest;
 }
 
+/** Exponents written with brackets, which may nest: (det A)^((n-1)^2). */
+function supBrackets(s) {
+  let out = '';
+  let rest = s;
+  for (let guard = 0; guard < 200; guard++) {
+    const m = /\^\s*(-?)\(/.exec(rest);
+    if (!m) break;
+    const start = m.index + m[0].length;
+    let depth = 1;
+    let i = start;
+    for (; i < rest.length && depth; i++) {
+      if (rest[i] === '(') depth++;
+      else if (rest[i] === ')') depth--;
+    }
+    if (depth) break;
+    out += rest.slice(0, m.index) + '<sup>' + m[1] + rest.slice(start, i - 1) + '</sup>';
+    rest = rest.slice(i);
+  }
+  return out + rest;
+}
+
 /** Everything that happens after escaping and after code spans are lifted out. */
 function applyRules(s) {
   for (const [re, to] of OPS) s = s.replace(re, to);
+  // twice, because the first pass consumes the middle operand of "1 x 1 x cos"
+  for (let pass = 0; pass < 2; pass++) for (const [re, to] of MUL) s = s.replace(re, to);
 
   s = s.replace(/\b(\d[spdf])(\d+)\b/g, '$1<sup>$2</sup>');          // 3d5, 4s1
+
+  // polyatomic ions keep the digit as a subscript: NH4+, OH-, MnO4-
+  s = s.replace(/\b((?:[A-Z][a-z]?\d*){2,})([+-])(?![A-Za-z0-9])/g,
+    (_, f, sign) => f.replace(/(\d+)/g, '<sub>$1</sub>') + '<sup>' + sign + '</sup>');
+
+  // ion charges: Fe2+, Cu2+, Na+, Cl-. A digit or letter after the sign means it
+  // is arithmetic (A2+B), not a charge.
+  s = s.replace(/\b([A-Z][a-z]?)(\d*)([+-])(?![A-Za-z0-9])/g,
+    (_, el, n, sign) => el + '<sup>' + n + sign + '</sup>');
+
+  s = s.replace(/(\([A-Za-z0-9]*[A-Z][A-Za-z0-9]*\))(\d+)\b/g,   // Ca(OH)2
+    '$1<sub>$2</sub>');
 
   s = s.replace(/\b((?:[A-Z][a-z]?\d*){2,})\b/g, (tok) =>            // H2SO4
     /\d/.test(tok) ? tok.replace(/(\d+)/g, '<sub>$1</sub>') : tok);
@@ -94,21 +132,33 @@ function applyRules(s) {
     if (s === before) break;
   }
 
-  s = s.replace(/([A-Za-z0-9\)\]\}])\^(\([^)]*\)|\{[^}]*\}|-?[A-Za-z0-9]+)/g,
-    (_, base, ex) => base + '<sup>' + ex.replace(/^[({]|[)}]$/g, '') + '</sup>');
+  // sqrt2, sqrt n: written without brackets
+  s = s.replace(/\bsqrt\s*([A-Za-z0-9]+)\b/g,
+    (_, inner) => '<span class="sqrt">\u221a<span class="rad">' + inner + '</span></span>');
+
+  s = supBrackets(s);
+  // a base may already carry markup, as in d<sub>1</sub>^k, or be a bar or a prime.
+  // digits are taken alone so that a^2e^2 does not swallow the e; a trailing sign is
+  // an ion charge (MnO4^-, C2O4^2-) only when no digit or letter follows it.
+  s = s.replace(
+    /([A-Za-z0-9\)\]\}|>'\u2032])\^(-?\d+(?:[+-](?![A-Za-z0-9]))?|[+-]\d+|\d*[+-](?![A-Za-z0-9])|-?[A-Za-z]+\d*|\u221e)/g,
+    (_, base, ex) => base + '<sup>' + ex + '</sup>');
 
   return s.replace(/\b([A-Za-z]+)\b/g, (w) =>
     Object.prototype.hasOwnProperty.call(GREEK, w) ? GREEK[w] : w);
 }
 
+/** A code span holding any of these is typeset as maths rather than left as code. */
+const MATHY = new RegExp(
+  '[=^]|\\bsqrt|&lt;=|&gt;=|\\bINT\\b|--?&gt;|\\+\\/-|\\b(' + Object.keys(GREEK).join('|') + ')\\b');
+
 function typesetInline(raw) {
   let s = esc(raw);
-
   // The notes use backticks for inline maths as well as for literal code, so
   // anything that looks like an expression is typeset rather than left as code.
   const held = [];
   s = s.replace(/`([^`]+)`/g, (_, code) => {
-    const isMath = /[=^]|sqrt\(|&lt;=|&gt;=|\bINT\b/.test(code) && !/\.(md|ps1|js|py|cmd)\b/.test(code);
+    const isMath = MATHY.test(code) && !/\.(md|ps1|js|py|cmd)\b/.test(code);
     held.push(isMath
       ? '<span class="imath">' + applyRules(code) + '</span>'
       : '<code>' + code + '</code>');
@@ -252,6 +302,12 @@ function isArt(lines) {
     if (/\|-{2,}|-{2,}\|/.test(l)) return true;    // boxes joined by arrows
     if (/\+-+\+-+\+/.test(l)) return true;         // tree connector or grid rule
     if (/-{3,}\+-{3,}/.test(l)) return true;       // a drawn axis crossing
+    if (/\+-{2,}>/.test(l)) return true;           // a drawn axis with an arrow head
+    if (/\+-{2,}/.test(l) && />\s*[A-Za-z]?\s*$/.test(l)) return true;   // axis with points on it
+    if (/\*{2,}/.test(l)) return true;             // a plotted curve
+    if (/\|/.test(l) && /[.*]/.test(l) && /^[\s|.*]*$/.test(l)) return true;   // dotted construction
+    if (/^\s*\^\s*$/.test(l)) return true;         // the tip of a drawn axis
+    if (/^\s*\/+\s*$/.test(l)) return true;        // a drawn slanted line
   }
   return false;
 }
@@ -260,9 +316,25 @@ function isArt(lines) {
  *  Cells are cut at the column positions given by the rule line, so a stray bar
  *  inside a cell (an absolute value) does not shift every column along. */
 function asciiTable(lines) {
-  const body = lines.filter((l) => l.trim() !== '');
+  const all = lines.filter((l) => l.trim() !== '');
   const edge = (l) => /^\s*\+[-+]+\+\s*$/.test(l) && (l.match(/\+/g) || []).length > 2;
-  if (body.length < 3 || !edge(body[0])) return null;
+
+  // a sentence may introduce or follow the table; it is kept, not thrown away
+  let from = 0;
+  while (from < all.length && !edge(all[from])) {
+    if (/[|+]/.test(all[from])) return null;
+    from++;
+  }
+  if (from >= all.length) return null;
+  let to = all.length;
+  while (to > from && !edge(all[to - 1]) && !/^\s*\|/.test(all[to - 1])) {
+    if (/[|+]/.test(all[to - 1])) return null;
+    to--;
+  }
+  const lead = all.slice(0, from);
+  const tail = all.slice(to);
+  const body = all.slice(from, to);
+  if (body.length < 3) return null;
 
   const cols = [];
   for (let k = 0; k < body[0].length; k++) if (body[0][k] === '+') cols.push(k);
@@ -297,7 +369,9 @@ function asciiTable(lines) {
   const bodyHtml = rest.map((g) =>
     g.map((r) => '<tr>' + r.map((c) => cell(c, 'td')).join('') + '</tr>').join('')).join('');
 
-  return '<div class="tablewrap"><table>' + head + '<tbody>' + bodyHtml + '</tbody></table></div>';
+  const note = (ls) => ls.map((l) => '<p class="tnote">' + typesetInline(l.trim()) + '</p>').join('');
+  return '<div class="tablewrap">' + note(lead) +
+         '<table>' + head + '<tbody>' + bodyHtml + '</tbody></table>' + note(tail) + '</div>';
 }
 
 /** Split "formula          note" into its two columns.
@@ -333,16 +407,23 @@ function unframe(lines) {
 
 /** Greek names and arrows inside a diagram, but only where nothing is column
  *  aligned after them, since these glyphs are narrower than the words. */
-const ART_WORD = new RegExp('\\b(' + Object.keys(GREEK).join('|') + ')\\b|-&gt;|&lt;-|&lt;=|&gt;=|!=', 'g');
+const ART_WORD = new RegExp('\\b(' + Object.keys(GREEK).join('|') + ')\\b|&lt;=|&gt;=|!=', 'g');
+const DRAWN = /[\u2500\u2502\u250c\u2510\u2514\u2518\u251c\u2524\u252c\u2534\u253c|]/;
 
 function artInline(line) {
   ART_WORD.lastIndex = 0;
   const first = ART_WORD.exec(line);
   if (!first) return line;
-  if (/\s{2,}\S/.test(line.slice(first.index + first[0].length))) return line;
-  return line.replace(ART_WORD, (m) =>
-    Object.prototype.hasOwnProperty.call(GREEK, m) ? GREEK[m] :
-    ({ '-&gt;': '→', '&lt;-': '←', '&lt;=': '≤', '&gt;=': '≥', '!=': '≠' })[m] || m);
+  // padding keeps the columns when something is lined up further along the line
+  const after = line.slice(first.index + first[0].length);
+  const aligned = /\s{2,}\S/.test(after) || DRAWN.test(after);
+  return line.replace(ART_WORD, (m) => {
+    const sym = Object.prototype.hasOwnProperty.call(GREEK, m) ? GREEK[m] :
+      ({ '&lt;=': '\u2264', '&gt;=': '\u2265', '!=': '\u2260' })[m] || m;
+    if (!aligned || sym === m) return sym;
+    const shown = m.replace(/&(gt|lt|amp);/g, ' ').length;
+    return sym + ' '.repeat(Math.max(0, shown - 1));
+  });
 }
 
 /** Redraw an indented +-- tree with box drawing glyphs, one char for one char
@@ -466,6 +547,13 @@ function outlineTree(lines) {
   return '<div class="outline' + (hasVal ? '' : ' solo') + '">' + html + '</div>';
 }
 
+/** A monospace diagram, tagged with its width so it can be scaled to fit. */
+function artBlock(lines) {
+  const cols = lines.reduce((n, l) => Math.max(n, l.length), 0);
+  return '<pre class="art" style="--cols:' + Math.max(cols, 20) + '">' +
+         lines.map((l) => artInline(esc(l))).join('\n') + '</pre>';
+}
+
 function renderBlock(code) {
   const raw = code.replace(/\r/g, '').replace(/\s+$/, '');
   let lines = raw.split('\n');
@@ -477,15 +565,19 @@ function renderBlock(code) {
   if (outline) return outline;
 
   if (isArt(lines)) {
-    const tree = prettyTree(lines) || lines;
-    return '<pre class="art">' + tree.map((l) => artInline(esc(l))).join('\n') + '</pre>';
+    return artBlock(prettyTree(lines) || lines);
   }
 
   // a callout box is unframed first; a bare matrix box is left for the parser
+  let framed = false;
   if (!matrixBandAt(lines, 0)) {
     const inner = unframe(lines);
-    if (inner) lines = inner;
+    if (inner) { lines = inner; framed = true; }
   }
+
+  // by this point a +---+ run is only leftover decoration around a matrix; blank
+  // it out rather than print it, keeping the columns the parser relies on
+  lines = lines.map((l) => l.replace(/\+[-=]{2,}\+/g, (m) => ' '.repeat(m.length)));
 
   const rows = [];
   let i = 0;
@@ -521,8 +613,19 @@ function renderBlock(code) {
 
     // no pipe stripping here: unframe() has already removed any real frame, so a
     // remaining | is an absolute value bar such as |x| >= 0
+    // a line with several wide gaps is a column layout (a balanced equation, a
+    // reactants/products table); splitting it in two would lose the alignment
+    if (!line.includes('=') && (line.trim().match(/\s{3,}/g) || []).length >= 2) {
+      rows.push({ expr: typesetInline(line.replace(/\s+$/, '')), aligned: true });
+      i++;
+      continue;
+    }
+
     const { expr, note } = splitRow(line);
-    const caption = !expr.includes('=') && expr === expr.toUpperCase() && expr.length > 3;
+    // a heading is all capitals with real words in it, and carries no note of its
+    // own; "2 H2" is a formula, not a heading
+    const caption = !note && !expr.includes('=') && !/[a-z]/.test(expr) &&
+      (expr.match(/[A-Z]/g) || []).length >= 4;
     rows.push({ expr: typesetInline(expr), note: note ? typesetInline(note) : '', caption });
     i++;
   }
@@ -534,12 +637,13 @@ function renderBlock(code) {
     const a = rows[k], b = rows[k - 1];
     if ((a.gap || a.divider) && (b.gap || b.divider)) rows.splice(a.divider ? k - 1 : k, 1);
   }
-  if (!rows.length) return '<pre class="art">' + esc(raw) + '</pre>';
+  if (!rows.length) return artBlock(raw.split('\n'));
 
-  const hasMath = sawStructure || rows.some((r) => !r.gap && !r.divider && r.expr.includes('='));
-  if (!hasMath) {
-    const tree = prettyTree(raw.split('\n')) || raw.split('\n');
-    return '<pre class="art">' + tree.map((l) => artInline(esc(l))).join('\n') + '</pre>';
+  const hasMath = sawStructure ||
+    rows.some((r) => !r.gap && !r.divider && /[=\u2264\u2265\u2260\u2192\u27f6\u00b1\u00d7\u222b\u2211\u221a]/.test(r.expr));
+  if (!hasMath && !framed) {
+    const src = raw.split('\n');
+    return artBlock(prettyTree(src) || src);
   }
 
   const hasNote = rows.some((r) => r.note);
@@ -548,6 +652,7 @@ function renderBlock(code) {
     if (r.gap) return '<div class="spacer"></div>';
     if (r.divider) return '<div class="fdiv"></div>';
     if (r.caption) return '<div class="cap">' + r.expr + '</div>';
+    if (r.aligned) return '<div class="expr wide algn">' + r.expr + '</div>';
     // a prose line with no formula and no note reads better across both columns
     const wide = !r.note && !r.expr.includes('=') ? ' wide' : '';
     return '<div class="expr' + wide + '">' + r.expr + '</div>' +

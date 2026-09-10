@@ -4,7 +4,7 @@ const $ = (s) => document.querySelector(s);
 const state = { tree: null, flat: [], current: null };
 
 async function boot() {
-  const res = await fetch('/api/tree');
+  const res = await fetch('tree.json');
   state.tree = await res.json();
   $('#rootline').textContent = state.tree.root;
   buildSide();
@@ -60,7 +60,8 @@ async function route() {
   document.body.dataset.subject = found.subject.name;   // drives the accent colour
   $('#main').innerHTML = '<p class="dim">Loading…</p>';
 
-  const res = await fetch('/api/doc?path=' + encodeURIComponent(`${path}/${file}.md`));
+  const docPath = `${path}/${file}.md`.split('/').map(encodeURIComponent).join('/');
+  const res = await fetch(docPath);
   if (!res.ok) { $('#main').innerHTML = '<p class="dim">Could not read that file.</p>'; return; }
   const src = await res.text();
   const { html, toc } = renderMarkdown(src);

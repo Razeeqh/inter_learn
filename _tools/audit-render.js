@@ -23,8 +23,13 @@ const issues = {
   missedMath: { desc: 'left as monospace but looks like formulas', hits: [] },
   hugeNote: { desc: 'note column suspiciously long (bad split)', hits: [] },
   rawCaret: { desc: 'caret or sqrt( survived into prose output', hits: [] },
+  rawSymbol: { desc: 'greek name, arrow or relation left as plain text', hits: [] },
+  artSymbol: { desc: 'greek name left as a word inside a diagram', hits: [] },
   wideArt: { desc: 'diagram wider than 100 columns (will scroll on phones)', hits: [] }
 };
+
+const GREEK_WORDS = /\b(alpha|beta|gamma|delta|epsilon|theta|lambda|mu|nu|pi|rho|sigma|tau|phi|chi|psi|omega|Delta|Sigma|Omega|Phi|Lambda|Theta|Gamma)\b/;
+const RELATIONS = /(^|[^-<>])(->|<-|<=|>=|!=|\+\/-)([^->]|$)/;
 
 function walk(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -69,12 +74,17 @@ for (const file of files) {
         }
         const widest = Math.max(...buf.map((l) => l.length));
         if (widest > 100) issues.wideArt.hits.push({ rel, line: start, code: `${widest} columns` });
+        const drawn = html.replace(/<[^>]+>/g, ' ');
+        if (GREEK_WORDS.test(drawn)) issues.artSymbol.hits.push({ rel, line: start, code });
       } else {
         // stray box drawing that should have been consumed by the parser
         // (a bare | is not counted: |x| is an absolute value)
         const text = html.replace(/<[^>]+>/g, ' ');
         if (/\+--|--\+/.test(text)) {
           issues.boxLeak.hits.push({ rel, line: start, code });
+        }
+        if (GREEK_WORDS.test(text) || RELATIONS.test(text)) {
+          issues.rawSymbol.hits.push({ rel, line: start, code });
         }
         const rows = [...html.matchAll(/<div class="expr">(.*?)<\/div><div class="note">(.*?)<\/div>/gs)];
         for (const r of rows) {
@@ -93,6 +103,9 @@ for (const file of files) {
     const out = T.inline(l).replace(/<[^>]+>/g, '');
     if (/\^|sqrt\(/.test(out)) {
       issues.rawCaret.hits.push({ rel, line: i + 1, code: l.trim().slice(0, 110) });
+    }
+    if (GREEK_WORDS.test(out) || RELATIONS.test(out)) {
+      issues.rawSymbol.hits.push({ rel, line: i + 1, code: l.trim().slice(0, 110) });
     }
   }
 }
