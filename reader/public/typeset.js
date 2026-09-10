@@ -1,0 +1,560 @@
+/* Turns the plain-text notation used in the notes into textbook typography.
+ *
+ * The source lines formulas up against their explanatory notes in columns:
+ *
+ *     C(i,j)    =  (-1)^(i+j) x M(i,j)          <- always apply the sign
+ *     |__________________________|                |___________________|
+ *               the formula                              the note
+ *
+ * Centring that as a single line makes it unreadable, so each block is parsed
+ * into (formula, note) rows and laid out as a two column sheet. Stacked
+ * fractions and +---+ matrices are rebuilt as real typeset objects.
+ *
+ * Anything that is genuinely a drawing - mind maps, ray diagrams, graphs,
+ * circuits - is left as untouched monospace, because substituting
+ * variable width glyphs into it would destroy the alignment it depends on.
+ */
+
+const GREEK = {
+  alpha: 'α', beta: 'β', gamma: 'γ', delta: 'Δ', epsilon: 'ε', zeta: 'ζ',
+  eta: 'η', theta: 'θ', iota: 'ι', kappa: 'κ', lambda: 'λ', mu: 'μ', nu: 'ν',
+  xi: 'ξ', pi: 'π', rho: 'ρ', sigma: 'σ', tau: 'τ', phi: 'φ', chi: 'χ',
+  psi: 'ψ', omega: 'ω',
+  Gamma: 'Γ', Delta: 'Δ', Theta: 'Θ', Lambda: 'Λ', Pi: 'Π', Sigma: 'Σ',
+  Phi: 'Φ', Psi: 'Ψ', Omega: 'Ω'
+};
+
+const OPS = [
+  [/&lt;--&gt;/g, '⟷'], [/&lt;=&gt;/g, '⇔'], [/&lt;-&gt;/g, '↔'],
+  [/--&gt;/g, '⟶'], [/-&gt;/g, '→'], [/&lt;--/g, '⟵'], [/&lt;-/g, '←'],
+  [/=&gt;/g, '⇒'], [/&lt;=/g, '≤'], [/&gt;=/g, '≥'],
+  [/!=/g, '≠'], [/~=/g, '≈'], [/\+\/-/g, '±'],
+  [/\.\.\./g, '…'],
+  [/\bINT\b/g, '∫'], [/\bSUM\b/g, '∑'],
+  [/\binfinity\b/g, '∞'],
+  [/\bangstrom\b/g, 'Å'],
+  [/(\d)\s*degrees\b/g, '$1°'],
+  [/(\d)\s*deg\b/g, '$1°'],
+  // "m x n", "n1 x u1", "2 x 3". Both sides must be short tokens so ordinary
+  // prose such as "the x axis" is left alone.
+  [/\b([A-Za-z0-9]{1,3})\s+x\s+([A-Za-z0-9]{1,3})\b/g, '$1 × $2'],
+  [/\b(\d)x(\d)\b/g, '$1 × $2'],
+  [/(\))\s+x\s+(?=[A-Za-z0-9(])/g, '$1 × ']
+];
+
+function esc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/* ---------------------------------------------------------------- inline */
+
+/** Rewrite name(...) using bracket matching, so nested calls survive. */
+function replaceCall(s, name, wrap) {
+  const re = new RegExp('\\b' + name + '\\s*\\(');
+  let out = '';
+  let rest = s;
+  for (let guard = 0; guard < 200; guard++) {
+    const m = re.exec(rest);
+    if (!m) break;
+    const start = m.index + m[0].length;
+    let depth = 1;
+    let i = start;
+    for (; i < rest.length && depth; i++) {
+      if (rest[i] === '(') depth++;
+      else if (rest[i] === ')') depth--;
+    }
+    if (depth) break;                                  // unbalanced: leave as written
+    out += rest.slice(0, m.index) + wrap(rest.slice(start, i - 1));
+    rest = rest.slice(i);
+  }
+  return out + rest;
+}
+
+/** Everything that happens after escaping and after code spans are lifted out. */
+function applyRules(s) {
+  for (const [re, to] of OPS) s = s.replace(re, to);
+
+  s = s.replace(/\b(\d[spdf])(\d+)\b/g, '$1<sup>$2</sup>');          // 3d5, 4s1
+
+  s = s.replace(/\b((?:[A-Z][a-z]?\d*){2,})\b/g, (tok) =>            // H2SO4
+    /\d/.test(tok) ? tok.replace(/(\d+)/g, '<sub>$1</sub>') : tok);
+  s = s.replace(/\b([A-Z][a-z]?)(\d+)\b/g, '$1<sub>$2</sub>');       // O2, Cl2
+  s = s.replace(/\b([A-Za-z])(\d)\b/g, '$1<sub>$2</sub>');           // n1, T2, S1
+
+  // indexed symbols: a(i,j) -> a with a double subscript
+  s = s.replace(/\b([A-Za-z])\(\s*([A-Za-z0-9]{1,2})\s*,\s*([A-Za-z0-9]{1,2})\s*\)/g,
+    '$1<sub>$2$3</sub>');
+
+  // sqrt() and abs() may be nested any number of levels deep, so the argument is
+  // found by matching brackets rather than by a regular expression
+  for (let pass = 0; pass < 4; pass++) {
+    const before = s;
+    s = replaceCall(s, 'abs', (x) => '<span class="abs">' + x + '</span>');
+    s = replaceCall(s, 'sqrt', (x) => '<span class="sqrt">√<span class="rad">' + x + '</span></span>');
+    if (s === before) break;
+  }
+
+  s = s.replace(/([A-Za-z0-9\)\]\}])\^(\([^)]*\)|\{[^}]*\}|-?[A-Za-z0-9]+)/g,
+    (_, base, ex) => base + '<sup>' + ex.replace(/^[({]|[)}]$/g, '') + '</sup>');
+
+  return s.replace(/\b([A-Za-z]+)\b/g, (w) =>
+    Object.prototype.hasOwnProperty.call(GREEK, w) ? GREEK[w] : w);
+}
+
+function typesetInline(raw) {
+  let s = esc(raw);
+
+  // The notes use backticks for inline maths as well as for literal code, so
+  // anything that looks like an expression is typeset rather than left as code.
+  const held = [];
+  s = s.replace(/`([^`]+)`/g, (_, code) => {
+    const isMath = /[=^]|sqrt\(|&lt;=|&gt;=|\bINT\b/.test(code) && !/\.(md|ps1|js|py|cmd)\b/.test(code);
+    held.push(isMath
+      ? '<span class="imath">' + applyRules(code) + '</span>'
+      : '<code>' + code + '</code>');
+    return '\u0000' + (held.length - 1) + '\u0000';
+  });
+
+  s = applyRules(s);
+  return s.replace(/\u0000(\d+)\u0000/g, (_, i) => held[+i]);
+}
+
+/* ------------------------------------------------------------ block parts */
+
+const pad = (l, n) => (l.length >= n ? l : l + ' '.repeat(n - l.length));
+
+/** One horizontal band that may hold SEVERAL matrices side by side, each with
+ *  its own height, plus the labels sitting between them ("P =", "Q ="). */
+function matrixBandAt(lines, i) {
+  const spans = [];
+  const re = /\+-{2,}\+/g;
+  let m;
+  while ((m = re.exec(lines[i])) !== null) spans.push({ s: m.index, e: m.index + m[0].length });
+  if (!spans.length) return null;
+
+  const parts = [];
+  let end = i + 1;
+
+  for (const sp of spans) {
+    const rows = [];
+    let bottom = -1;
+    for (let j = i + 1; j < lines.length; j++) {
+      const seg = pad(lines[j], sp.e).slice(sp.s, sp.e);
+      if (/^\+-{2,}\+$/.test(seg)) { bottom = j; break; }
+      if (seg.charAt(0) !== '|' || seg.charAt(seg.length - 1) !== '|') break;
+      rows.push(seg.slice(1, -1).trim().split(/\s{2,}/).filter((c) => c !== ''));
+    }
+    if (bottom < 0 || !rows.length) return null;
+    const w = rows[0].length;
+    if (!w || !rows.every((r) => r.length === w)) return null;
+    if (rows.some((r) => r.some((c) => c.length > 14))) return null;
+    end = Math.max(end, bottom + 1);
+    parts.push({ sp, rows, bottom });
+  }
+
+  // whatever sits in the gap before each matrix is its label
+  let html = '';
+  for (let k = 0; k < parts.length; k++) {
+    const from = k ? parts[k - 1].sp.e : 0;
+    const to = parts[k].sp.s;
+    let label = '';
+    for (let j = i; j <= parts[k].bottom && !label; j++) {
+      label = pad(lines[j], to).slice(from, to).trim();
+    }
+    html += '<span class="matgroup">' +
+      (label ? '<span class="matlabel">' + typesetInline(label) + '</span>' : '') +
+      renderMatrix(parts[k].rows) + '</span>';
+  }
+
+  // trailing text to the right of the last matrix becomes the note
+  const last = parts[parts.length - 1].sp.e;
+  const notes = [];
+  for (let j = i; j < end; j++) {
+    const t = (lines[j] || '').slice(last).trim();
+    if (t) notes.push(t);
+  }
+
+  return { end, html, notes };
+}
+
+function renderMatrix(rows) {
+  const cells = rows.map((r) =>
+    r.map((c) => '<span class="mcell">' + typesetInline(c) + '</span>').join('')
+  ).join('');
+  return '<span class="mat" style="--cols:' + rows[0].length + '">' +
+         '<span class="mgrid">' + cells + '</span></span>';
+}
+
+/** One or more horizontal bars on a line, each with a numerator above and a
+ *  denominator below, plus whatever joins them ("a/b + c/d + ... = e/f"). */
+function fractionAt(lines, i) {
+  const cur = lines[i];
+  const prev = lines[i - 1];
+  const next = lines[i + 1];
+  if (prev === undefined || next === undefined) return null;
+
+  const runs = [];
+  const re = /-{3,}/g;
+  let m;
+  while ((m = re.exec(cur))) {
+    const e = m.index + m[0].length;
+    if (/[->]/.test(cur.charAt(e))) return null;           // part of an arrow
+    runs.push([m.index, e]);
+  }
+  if (!runs.length) return null;
+
+  const seg = (l, s, e) => pad(l || '', e).slice(s, e).trim();
+  const first = runs[0][0];
+  if (next.slice(0, first).trim()) return null;            // denominator must start under the bar
+  const label = prev.slice(0, first).trim();               // e.g. a list marker beside the numerator
+  if (label.length > 6) return null;
+
+  const parts = [];
+  for (const [s, e] of runs) {
+    const num = seg(prev, s, e);
+    const den = seg(next, s, e);
+    if (!num || !den) return null;
+    parts.push(frac(num, den));
+  }
+
+  // whatever sits between two bars is the operator joining the fractions
+  let html = '';
+  for (let k = 0; k < parts.length; k++) {
+    if (k) {
+      const gap = [cur.slice(runs[k - 1][1], runs[k][0]), seg(prev, runs[k - 1][1], runs[k][0])]
+        .map((t) => t.trim()).filter(Boolean).join(' ');
+      html += gap ? ' ' + typesetInline(gap) + ' ' : ' ';
+    }
+    html += parts[k];
+  }
+
+  const lead = [label, cur.slice(0, first).trim()].filter(Boolean).join(' ');
+  const last = runs[runs.length - 1][1];
+  return {
+    html: (lead ? typesetInline(lead) + ' ' : '') + html,
+    rhs: [cur.slice(last).trim(), prev.slice(last).trim(), next.slice(last).trim()]
+      .filter(Boolean).join('  ')
+  };
+}
+
+const frac = (n, d) =>
+  '<span class="frac"><span class="num">' + typesetInline(n) +
+  '</span><span class="den">' + typesetInline(d) + '</span></span>';
+
+/* ---------------------------------------------------------------- blocks */
+
+function isArt(lines) {
+  const body = lines.filter((l) => l.trim() !== '');
+  if (!body.length) return true;
+  for (const l of body) {
+    if (/\\/.test(l)) return true;                 // drawn branches
+    if (/_{3,}/.test(l)) return true;              // drawn baselines
+    if (/\|-{2,}|-{2,}\|/.test(l)) return true;    // boxes joined by arrows
+    if (/\+-+\+-+\+/.test(l)) return true;         // tree connector or grid rule
+    if (/-{3,}\+-{3,}/.test(l)) return true;       // a drawn axis crossing
+  }
+  return false;
+}
+
+/** A +---+---+ grid table becomes a real table rather than monospace.
+ *  Cells are cut at the column positions given by the rule line, so a stray bar
+ *  inside a cell (an absolute value) does not shift every column along. */
+function asciiTable(lines) {
+  const body = lines.filter((l) => l.trim() !== '');
+  const edge = (l) => /^\s*\+[-+]+\+\s*$/.test(l) && (l.match(/\+/g) || []).length > 2;
+  if (body.length < 3 || !edge(body[0])) return null;
+
+  const cols = [];
+  for (let k = 0; k < body[0].length; k++) if (body[0][k] === '+') cols.push(k);
+  const width = cols.length - 1;
+  if (width < 2) return null;
+
+  const groups = [];
+  let cur = [];
+  for (const l of body) {
+    if (edge(l)) { if (cur.length) { groups.push(cur); cur = []; } continue; }
+    if (!/^\s*\|/.test(l)) return null;
+    // cut at the rule positions when the row lines up, otherwise fall back to
+    // splitting on the bars
+    if (cols.every((c) => c >= l.length || l[c] === '|')) {
+      cur.push(cols.slice(0, -1).map((c, k) =>
+        (k === width - 1 ? l.slice(c + 1) : l.slice(c + 1, cols[k + 1]))
+          .replace(/\|\s*$/, '').trim()));
+    } else {
+      const parts = l.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+      if (parts.length !== width) return null;
+      cur.push(parts);
+    }
+  }
+  if (cur.length) groups.push(cur);
+  if (!groups.length) return null;
+
+  const cell = (c, tag) => '<' + tag + '>' + typesetInline(c) + '</' + tag + '>';
+  const head = groups.length > 1
+    ? '<thead>' + groups[0].map((r) => '<tr>' + r.map((c) => cell(c, 'th')).join('') + '</tr>').join('') + '</thead>'
+    : '';
+  const rest = groups.length > 1 ? groups.slice(1) : groups;
+  const bodyHtml = rest.map((g) =>
+    g.map((r) => '<tr>' + r.map((c) => cell(c, 'td')).join('') + '</tr>').join('')).join('');
+
+  return '<div class="tablewrap"><table>' + head + '<tbody>' + bodyHtml + '</tbody></table></div>';
+}
+
+/** Split "formula          note" into its two columns.
+ *  The gap that starts the note is looked for AFTER the last '=', so that wide
+ *  spacing used inside a formula does not chop the formula in half. */
+function splitRow(line) {
+  const t = line.trim();
+  const eq = t.indexOf('=');
+  const from = eq >= 0 ? eq + 1 : 0;
+  const m = /\s{3,}/.exec(t.slice(from));
+  if (!m) return { expr: t, note: '' };
+  const at = from + m.index;
+  return { expr: t.slice(0, at).trim(), note: t.slice(at).trim() };
+}
+
+const DIVIDER = '\u0001';
+
+/** Strip a +----+ / +====+ panel frame. Internal rules become section dividers. */
+function unframe(lines) {
+  const body = lines.filter((l) => l.trim() !== '');
+  if (body.length < 3) return null;
+  const edge = (l) => /^\s*\+[-=]+\+\s*$/.test(l);
+  if (!edge(body[0]) || !edge(body[body.length - 1])) return null;
+
+  const out = [];
+  for (const l of body.slice(1, -1)) {
+    if (edge(l)) { out.push(DIVIDER); continue; }
+    if (!/^\s*\|.*\|\s*$/.test(l)) return null;
+    out.push(l.replace(/^\s*\|/, '').replace(/\|\s*$/, ''));
+  }
+  return out.length ? out : null;
+}
+
+/** Greek names and arrows inside a diagram, but only where nothing is column
+ *  aligned after them, since these glyphs are narrower than the words. */
+const ART_WORD = new RegExp('\\b(' + Object.keys(GREEK).join('|') + ')\\b|-&gt;|&lt;-|&lt;=|&gt;=|!=', 'g');
+
+function artInline(line) {
+  ART_WORD.lastIndex = 0;
+  const first = ART_WORD.exec(line);
+  if (!first) return line;
+  if (/\s{2,}\S/.test(line.slice(first.index + first[0].length))) return line;
+  return line.replace(ART_WORD, (m) =>
+    Object.prototype.hasOwnProperty.call(GREEK, m) ? GREEK[m] :
+    ({ '-&gt;': '→', '&lt;-': '←', '&lt;=': '≤', '&gt;=': '≥', '!=': '≠' })[m] || m);
+}
+
+/** Redraw an indented +-- tree with box drawing glyphs, one char for one char
+ *  so the column alignment the diagram depends on is preserved exactly. */
+function prettyTree(lines) {
+  if (!lines.some((l) => /\+-|-\+/.test(l))) return null;
+  if (lines.some((l) => /^\s*\+-+\+\s*$/.test(l))) return null;   // that is a box, not a tree
+
+  const g = lines.map((l) => l.split(''));
+  const at = (r, c) => (g[r] && g[r][c]) || ' ';
+  const BOX = '─│┌┐└┘├┤┬┴┼';
+
+  for (let r = 0; r < g.length; r++)
+    for (let c = 0; c < g[r].length; c++)
+      if (g[r][c] === '|') g[r][c] = '│';
+
+  const scan = (r, c, step) => {
+    for (let k = r + step; k >= 0 && k < g.length; k += step) {
+      const d = at(k, c);
+      if (d === '│' || d === '+') return true;
+      if (d !== ' ') return false;
+    }
+    return false;
+  };
+
+  for (let r = 0; r < g.length; r++) {
+    for (let c = 0; c < g[r].length; c++) {
+      if (g[r][c] !== '+') continue;
+      const left = at(r, c - 1) === '-';
+      const right = at(r, c + 1) === '-';
+      const up = scan(r, c, -1);
+      const down = scan(r, c, 1);
+      g[r][c] =
+        up && down && left && right ? '┼' :
+        down && left && right ? '┬' :
+        up && left && right ? '┴' :
+        down && right ? '┌' :
+        down && left ? '┐' :
+        up && right ? '└' :
+        up && left ? '┘' :
+        left && right ? '─' : '+';
+    }
+  }
+
+  // only dash runs that touch box work become rules, so hyphens in words survive
+  for (let r = 0; r < g.length; r++) {
+    for (let c = 0; c < g[r].length; c++) {
+      if (g[r][c] !== '-') continue;
+      let e = c;
+      while (g[r][e] === '-') e++;
+      if (e - c >= 2 && (BOX.includes(at(r, c - 1)) || BOX.includes(at(r, e)))) {
+        for (let k = c; k < e; k++) g[r][k] = '─';
+      }
+      c = e - 1;
+    }
+  }
+  return g.map((r) => r.join(''));
+}
+
+/** Split "label ....... formula" or "label    formula" into its two halves. */
+function outlineSplit(text) {
+  const dots = /\s\.+\s+/.exec(text);
+  if (dots) return { label: text.slice(0, dots.index).trim(), value: text.slice(dots.index + dots[0].length).trim() };
+  const gap = /\s{2,}/.exec(text);
+  if (gap) {
+    const left = text.slice(0, gap.index);
+    const right = text.slice(gap.index).trim();
+    // only peel a formula off the right when the left is a plain label
+    if (right.includes('=') && !left.includes('=')) return { label: left.trim(), value: right };
+  }
+  return { label: text.trim(), value: '' };
+}
+
+const BULLET = ['\u25cf', '\u25b8', '\u25e6', '\u2013'];
+
+/** An indented "+--" outline becomes a real bulleted list: the | rails and the
+ *  +-- markers are structure, not content, so they are turned into indentation
+ *  and bullets instead of being printed. */
+function outlineTree(lines) {
+  const body = lines.filter((l) => l.trim() !== '');
+  if (body.length < 4) return null;
+
+  const BRANCH = /^([\s|]*)\+--\s?(.*)$/;
+  let branches = 0;
+  for (const l of body) {
+    if (/\\|_{3,}|\|-{2,}|\+-{3,}|-{2,}\+/.test(l)) return null;   // real diagram
+    if (BRANCH.test(l)) { branches++; continue; }
+    if (/\+[-+|]|[-+|]\+/.test(l)) return null;                    // a drawn joint, not "a + b"
+  }
+  if (branches < 3) return null;
+
+  const cols = Array.from(new Set(body.filter((l) => BRANCH.test(l)).map((l) => l.indexOf('+'))))
+    .sort((a, b) => a - b);
+
+  const items = [];
+  for (const l of body) {
+    const m = BRANCH.exec(l);
+    if (m) { items.push({ lvl: cols.indexOf(l.indexOf('+')), text: m[2].trim(), cont: [] }); continue; }
+    if (/^[\s|]*$/.test(l)) continue;                              // a bare rail
+    const text = l.replace(/\|/g, ' ').trim();
+    const last = items[items.length - 1];
+    if (!last) items.push({ title: true, text });
+    else if (last.title) last.text += ' ' + text;
+    else last.cont.push(text);
+  }
+  if (!items.length) return null;
+
+  let hasVal = false;
+  const html = items.map((it) => {
+    if (it.title) return '<div class="ol-title">' + typesetInline(it.text) + '</div>';
+    const { label, value } = outlineSplit(it.text);
+    const val = [value].concat(it.cont).filter(Boolean).join('   ');
+    if (val) hasVal = true;
+    const math = !val && label.includes('=') ? ' math' : '';
+    const lab = '<div class="ol-lab' + math + (val ? '' : ' wide') + '" style="--lvl:' + it.lvl + '">' +
+      '<span class="ol-b">' + BULLET[Math.min(it.lvl, BULLET.length - 1)] + '</span>' +
+      '<span>' + typesetInline(label) + '</span></div>';
+    return val ? lab + '<div class="ol-val">' + typesetInline(val) + '</div>' : lab;
+  }).join('');
+
+  return '<div class="outline' + (hasVal ? '' : ' solo') + '">' + html + '</div>';
+}
+
+function renderBlock(code) {
+  const raw = code.replace(/\r/g, '').replace(/\s+$/, '');
+  let lines = raw.split('\n');
+
+  const table = asciiTable(lines);
+  if (table) return table;
+
+  const outline = outlineTree(lines);
+  if (outline) return outline;
+
+  if (isArt(lines)) {
+    const tree = prettyTree(lines) || lines;
+    return '<pre class="art">' + tree.map((l) => artInline(esc(l))).join('\n') + '</pre>';
+  }
+
+  // a callout box is unframed first; a bare matrix box is left for the parser
+  if (!matrixBandAt(lines, 0)) {
+    const inner = unframe(lines);
+    if (inner) lines = inner;
+  }
+
+  const rows = [];
+  let i = 0;
+  let sawStructure = false;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line === DIVIDER) { rows.push({ divider: true }); i++; continue; }
+    if (!line.trim()) { rows.push({ gap: true }); i++; continue; }
+
+    const mat = matrixBandAt(lines, i);
+    if (mat) {
+      sawStructure = true;
+      rows.push({ expr: mat.html, note: mat.notes.map(typesetInline).join('<br>') });
+      i = mat.end;
+      continue;
+    }
+
+    // look ahead: this line may be the numerator of a fraction on the next line
+    const fr = fractionAt(lines, i + 1);
+    if (fr) {
+      sawStructure = true;
+      const tail = splitRow(fr.rhs);
+      rows.push({
+        expr: fr.html,
+        note: [tail.expr, tail.note].filter(Boolean).map(typesetInline).join('  ')
+      });
+      i += 3;
+      continue;
+    }
+
+    if (/^\s*(\+[-=+]+\+[ \t]*)+$/.test(line)) { i++; continue; }   // leftover frame
+
+    // no pipe stripping here: unframe() has already removed any real frame, so a
+    // remaining | is an absolute value bar such as |x| >= 0
+    const { expr, note } = splitRow(line);
+    const caption = !expr.includes('=') && expr === expr.toUpperCase() && expr.length > 3;
+    rows.push({ expr: typesetInline(expr), note: note ? typesetInline(note) : '', caption });
+    i++;
+  }
+
+  while (rows.length && (rows[0].gap || rows[0].divider)) rows.shift();
+  while (rows.length && (rows[rows.length - 1].gap || rows[rows.length - 1].divider)) rows.pop();
+  // a run of blank source lines should not become a run of empty rows
+  for (let k = rows.length - 1; k > 0; k--) {
+    const a = rows[k], b = rows[k - 1];
+    if ((a.gap || a.divider) && (b.gap || b.divider)) rows.splice(a.divider ? k - 1 : k, 1);
+  }
+  if (!rows.length) return '<pre class="art">' + esc(raw) + '</pre>';
+
+  const hasMath = sawStructure || rows.some((r) => !r.gap && !r.divider && r.expr.includes('='));
+  if (!hasMath) {
+    const tree = prettyTree(raw.split('\n')) || raw.split('\n');
+    return '<pre class="art">' + tree.map((l) => artInline(esc(l))).join('\n') + '</pre>';
+  }
+
+  const hasNote = rows.some((r) => r.note);
+  // flat grid markup so every formula in a block lines up on the same column
+  const html = rows.map((r) => {
+    if (r.gap) return '<div class="spacer"></div>';
+    if (r.divider) return '<div class="fdiv"></div>';
+    if (r.caption) return '<div class="cap">' + r.expr + '</div>';
+    // a prose line with no formula and no note reads better across both columns
+    const wide = !r.note && !r.expr.includes('=') ? ' wide' : '';
+    return '<div class="expr' + wide + '">' + r.expr + '</div>' +
+           (wide ? '' : '<div class="note">' + (r.note || '') + '</div>');
+  }).join('');
+
+  return '<div class="fsheet' + (hasNote ? '' : ' solo') + '">' + html + '</div>';
+}
+
+window.Typeset = { inline: typesetInline, block: renderBlock, esc };

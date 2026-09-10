@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AP Inter MPC — Reader</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="bar">
+  <button id="menu" class="icon" title="Chapters">☰</button>
+  <a class="brand" href="#">AP Inter MPC</a>
+  <input id="find" type="search" placeholder="Search chapters and topics    /" autocomplete="off">
+  <div class="spacer"></div>
+  <button id="zoomOut" class="icon" title="Smaller diagrams">A−</button>
+  <button id="zoomIn" class="icon" title="Larger diagrams">A+</button>
+  <button id="theme" class="icon" title="Light / dark">◐</button>
+</header>
+
+<div id="hits" class="hits" hidden></div>
+
+<div class="shell">
+  <nav id="side" class="side"></nav>
+  <main id="main" class="main">
+    <div class="welcome">
+      <h1>Reading straight from your folders</h1>
+      <p id="rootline" class="dim"></p>
+      <p>Pick a chapter on the left. Nothing here is copied or pre-built — the
+         markdown files are read from disk each time you open a page, so an edit
+         shows up on the next refresh.</p>
+      <div class="legend">
+        <div><code>x^2</code> <span>→</span> <b>x<sup>2</sup></b></div>
+        <div><code>sqrt(l/g)</code> <span>→</span> <b class="sqrt">√<span class="rad">l/g</span></b></div>
+        <div><code>theta</code> <span>→</span> <b>θ</b></div>
+        <div><code>H2SO4</code> <span>→</span> <b>H<sub>2</sub>SO<sub>4</sub></b></div>
+        <div><code>3d5</code> <span>→</span> <b>3d<sup>5</sup></b></div>
+        <div><code>&lt;=</code> <span>→</span> <b>≤</b></div>
+      </div>
+    </div>
+  </main>
+  <aside id="toc" class="toc"></aside>
+</div>
+
+<script src="typeset.js"></script>
+<script src="md.js"></script>
+<script src="anim.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
