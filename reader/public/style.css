@@ -346,6 +346,42 @@ pre.art {
 .anim .jump      { offset-path: path("M180,14 L180,62"); animation: run 2.6s ease-in infinite; }
 .anim .photon    { animation: dashFlow .9s linear infinite; }
 
+/* maths */
+.anim .chord     { transform-origin: 187px 71px; animation: pivot 3.4s ease-in-out infinite alternate; }
+.anim .slide     { offset-path: path("M316,92 L200,73"); animation: run 3.4s ease-in-out infinite alternate; }
+.anim .strip     { fill: var(--accent); opacity: .22; transform-box: fill-box; transform-origin: bottom;
+                   animation: rise 2.6s ease-out infinite; }
+.anim .strip.s2  { animation-delay: -.2s; }
+.anim .strip.s3  { animation-delay: -.4s; }
+.anim .strip.s4  { animation-delay: -.6s; }
+.anim .strip.s5  { animation-delay: -.8s; }
+.anim .strip.s6  { animation-delay: -1s; }
+.anim .uc        { transform-origin: 90px 90px; animation: spin 3s linear infinite; }
+.anim .cone      { fill: var(--accent-soft); stroke: var(--line); stroke-width: 2; }
+.anim .cut       { transform-origin: 210px 52px; animation: slice 5s ease-in-out infinite alternate; }
+.anim .section   { fill: none; stroke: var(--accent); stroke-width: 2; }
+.anim .sum       { stroke-width: 3; }
+.anim .para      { animation: fade 3s ease-in-out infinite alternate; }
+.anim .locus-path { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 4 5; }
+.anim .orbit2    { transform-origin: 210px 85px; animation: spin 4s linear infinite; }
+
+/* chemistry */
+.anim .cloud     { fill: var(--accent); opacity: .2; }
+.anim .pulse     { animation: breathe 2.6s ease-in-out infinite; }
+.anim .pulse2    { animation: breathe 2.6s ease-in-out infinite; transform-origin: 255px 80px; }
+.anim .trace.alt { stroke: var(--dim); }
+.anim .dashy     { stroke-dasharray: 7 5; }
+.anim .eqdot     { offset-path: path("M50,25 C 130,25 170,80 330,84"); animation: run 4s ease-in-out infinite; }
+.anim .climb     { offset-path: path("M55,95 C 130,95 150,25 210,25 C 270,25 290,110 360,110"); animation: run 4.5s ease-in-out infinite; }
+.anim .beaker    { fill: var(--accent-soft); stroke: var(--line); stroke-width: 2; }
+.anim .bridge    { fill: var(--soft); stroke: var(--line); stroke-width: 2; }
+.anim .wirepath  { fill: none; stroke: var(--line); stroke-width: 2; }
+.anim .flow      { offset-path: path("M107,35 L107,20 L313,20 L313,35"); animation: run 2.6s linear infinite; }
+.anim .flow.f2   { animation-delay: -1.3s; }
+.anim .cellface  { fill: none; stroke: var(--accent); stroke-width: 2; }
+.anim .cellface.back { opacity: .45; }
+.anim .cube      { animation: fade 3.4s ease-in-out infinite alternate; }
+
 @keyframes shmMove { from { transform: translateX(-38px); } to { transform: translateX(38px); } }
 @keyframes run     { from { offset-distance: 0%; } to { offset-distance: 100%; } }
 @keyframes waveRun { from { transform: translateX(0); } to { transform: translateX(120px); } }
@@ -362,6 +398,11 @@ pre.art {
 @keyframes glow    { 0%,100% { opacity: 1; } 50% { opacity: .15; } }
 @keyframes nudge   { from { transform: translateX(0); } to { transform: translateX(74px); } }
 @keyframes flick   { from { transform: rotate(-32deg); } to { transform: rotate(32deg); } }
+@keyframes pivot   { from { transform: rotate(0deg); } to { transform: rotate(-9deg); } }
+@keyframes rise    { 0% { transform: scaleY(0); } 60%, 100% { transform: scaleY(1); } }
+@keyframes slice   { from { transform: rotate(0deg); } to { transform: rotate(24deg); } }
+@keyframes fade    { from { opacity: .45; } to { opacity: 1; } }
+@keyframes breathe { 0%,100% { transform: scale(1); opacity: .2; } 50% { transform: scale(1.1); opacity: .34; } }
 
 .anim.paused * { animation-play-state: paused !important; }
 @media (prefers-reduced-motion: reduce) { .anim * { animation: none !important; } }

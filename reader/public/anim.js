@@ -284,25 +284,260 @@ const FIGURES = {
         <text x="300" y="80" class="lbl">photon</text>
         <text x="120" y="172" class="lbl">n = 3 &#8594; n = 1</text>
       </svg>`
+  },
+
+  /* ------------------------------------------------------------- maths */
+
+  tangent: {
+    title: 'The derivative is a slope',
+    caption: 'Slide the second point towards the first. The chord through them turns into the tangent, ' +
+             'and its slope is the derivative at that point.',
+    svg: `
+      <svg viewBox="0 0 420 180" role="img" aria-label="A chord becoming a tangent to a curve">
+        <line x1="30" y1="150" x2="400" y2="150" class="ax"/>
+        <line x1="40" y1="15" x2="40" y2="160" class="ax"/>
+        <path class="trace solid" d="M50,145 Q 160,10 380,120"/>
+        <g class="chord">
+          <line x1="97" y1="57" x2="347" y2="96" class="vec"/>
+          <circle cx="316" cy="92" r="6" class="mass slide"/>
+        </g>
+        <circle cx="187" cy="71" r="6" class="mass"/>
+        <text x="193" y="64" class="lbl">P</text>
+        <text x="150" y="172" class="lbl">as Q slides to P the chord becomes the tangent</text>
+      </svg>`
+  },
+
+  area: {
+    title: 'An integral is an area',
+    caption: 'Thin strips under the curve are added up. As the strips get narrower the total settles on ' +
+             'the exact area, and that limit is the definite integral.',
+    svg: `
+      <svg viewBox="0 0 420 170" role="img" aria-label="Strips filling the area under a curve">
+        <line x1="30" y1="140" x2="400" y2="140" class="ax"/>
+        <line x1="40" y1="15" x2="40" y2="150" class="ax"/>
+        <g class="strips">
+          <rect x="60"  y="112" width="34" height="28"  class="strip"/>
+          <rect x="98"  y="87"  width="34" height="53"  class="strip s2"/>
+          <rect x="136" y="65"  width="34" height="75"  class="strip s3"/>
+          <rect x="174" y="48"  width="34" height="92"  class="strip s4"/>
+          <rect x="212" y="35"  width="34" height="105" class="strip s5"/>
+          <rect x="250" y="26"  width="34" height="114" class="strip s6"/>
+        </g>
+        <path class="trace solid" d="M50,132 Q 180,30 300,22"/>
+        <text x="60" y="160" class="lbl">a</text>
+        <text x="280" y="160" class="lbl">b</text>
+        <text x="310" y="90" class="lbl">area = &#8747; f(x) dx</text>
+      </svg>`
+  },
+
+  unitcircle: {
+    title: 'Where sine and cosine come from',
+    caption: 'A point travels round a circle of radius 1. Its height above the axis is the sine of the ' +
+             'angle and its distance along is the cosine. That is why they repeat every 360&#176;.',
+    svg: `
+      <svg viewBox="0 0 420 180" role="img" aria-label="A point on the unit circle tracing a sine curve">
+        <circle cx="90" cy="90" r="62" class="ax dash" fill="none"/>
+        <line x1="28" y1="90" x2="152" y2="90" class="ax"/>
+        <line x1="90" y1="28" x2="90" y2="152" class="ax"/>
+        <g class="uc">
+          <line x1="90" y1="90" x2="152" y2="90" class="vec"/>
+          <circle cx="152" cy="90" r="6" class="mass"/>
+        </g>
+        <line x1="170" y1="90" x2="400" y2="90" class="ax dash"/>
+        <path class="trace solid" d="M170,90 q 14,-44 29,0 t 29,0 t 29,0 t 29,0 t 29,0 t 29,0 t 29,0"/>
+        <text x="176" y="168" class="lbl">the height traces the sine curve</text>
+      </svg>`
+  },
+
+  conic: {
+    title: 'Where the conics come from',
+    caption: 'One double cone, cut at different angles: level gives a circle, a gentle tilt an ellipse, ' +
+             'parallel to the side a parabola, and steeper still a hyperbola.',
+    svg: `
+      <svg viewBox="0 0 420 180" role="img" aria-label="A cone cut at different angles">
+        <path class="cone" d="M210,90 L150,20 L270,20 Z"/>
+        <path class="cone" d="M210,90 L150,160 L270,160 Z"/>
+        <g class="cut">
+          <line x1="152" y1="52" x2="268" y2="52" class="vec"/>
+          <ellipse cx="210" cy="52" rx="28" ry="7" class="section"/>
+        </g>
+        <text x="296" y="44" class="lbl">flat cut &#8594; circle</text>
+        <text x="296" y="64" class="lbl">tilt &#8594; ellipse</text>
+        <text x="296" y="84" class="lbl">steeper &#8594; parabola</text>
+        <text x="296" y="104" class="lbl">steepest &#8594; hyperbola</text>
+      </svg>`
+  },
+
+  vectors: {
+    title: 'Adding two vectors',
+    caption: 'Place them tail to tail and complete the parallelogram: the diagonal is the sum. ' +
+             'Tail to head gives the same answer, which is the triangle law.',
+    svg: `
+      <svg viewBox="0 0 420 170" role="img" aria-label="The parallelogram law of vector addition">
+        <g class="para">
+          <line x1="60" y1="140" x2="200" y2="140" class="vec"/>
+          <line x1="60" y1="140" x2="130" y2="50" class="vec"/>
+          <line x1="200" y1="140" x2="270" y2="50" class="ax dash"/>
+          <line x1="130" y1="50" x2="270" y2="50" class="ax dash"/>
+          <line x1="60" y1="140" x2="270" y2="50" class="vec sum"/>
+        </g>
+        <text x="128" y="158" class="lbl">a</text>
+        <text x="82" y="92" class="lbl">b</text>
+        <text x="188" y="86" class="lbl">a + b</text>
+      </svg>`
+  },
+
+  locus: {
+    title: 'A locus is a rule',
+    caption: 'Every point that obeys one condition. Keep the distance from a fixed point the same and ' +
+             'the path you trace is a circle.',
+    svg: `
+      <svg viewBox="0 0 420 170" role="img" aria-label="A point tracing a circle at a fixed distance">
+        <circle cx="210" cy="85" r="5" class="mass"/>
+        <circle cx="210" cy="85" r="60" class="locus-path" fill="none"/>
+        <g class="orbit2">
+          <line x1="210" y1="85" x2="270" y2="85" class="ax dash"/>
+          <circle cx="270" cy="85" r="7" class="mass"/>
+        </g>
+        <text x="218" y="82" class="lbl">C</text>
+        <text x="228" y="104" class="lbl">r</text>
+        <text x="120" y="164" class="lbl">CP = r at every point</text>
+      </svg>`
+  },
+
+  /* --------------------------------------------------------- chemistry */
+
+  orbital: {
+    title: 'Shapes of the orbitals',
+    caption: 'An orbital is where the electron is likely to be, not a track it runs on. ' +
+             's is a ball; each p orbital is two lobes along one axis.',
+    svg: `
+      <svg viewBox="0 0 420 160" role="img" aria-label="An s orbital and a p orbital">
+        <circle cx="95" cy="80" r="42" class="cloud pulse"/>
+        <circle cx="95" cy="80" r="4" class="mass"/>
+        <text x="78" y="140" class="lbl">s orbital</text>
+        <g class="pulse2">
+          <ellipse cx="255" cy="52" rx="24" ry="34" class="cloud"/>
+          <ellipse cx="255" cy="108" rx="24" ry="34" class="cloud"/>
+        </g>
+        <circle cx="255" cy="80" r="4" class="mass"/>
+        <text x="238" y="150" class="lbl">p orbital</text>
+        <line x1="330" y1="80" x2="400" y2="80" class="ax dash"/>
+        <text x="332" y="72" class="lbl">nodal plane</text>
+      </svg>`
+  },
+
+  equilibrium: {
+    title: 'Equilibrium is a balance of rates',
+    caption: 'The forward rate falls and the backward rate rises until they are equal. Both reactions ' +
+             'keep going after that, which is why it is called dynamic.',
+    svg: `
+      <svg viewBox="0 0 420 165" role="img" aria-label="Forward and backward rates meeting">
+        <line x1="45" y1="135" x2="380" y2="135" class="ax"/>
+        <line x1="45" y1="15" x2="45" y2="140" class="ax"/>
+        <path class="trace solid" d="M50,25 C 130,25 170,80 330,84"/>
+        <path class="trace solid alt" d="M50,132 C 130,132 170,88 330,84"/>
+        <line x1="330" y1="84" x2="380" y2="84" class="ax dash"/>
+        <circle r="6" class="mass eqdot"/>
+        <text x="150" y="42" class="lbl">forward rate</text>
+        <text x="150" y="126" class="lbl">backward rate</text>
+        <text x="250" y="76" class="lbl">equilibrium</text>
+        <text x="180" y="158" class="lbl">time</text>
+      </svg>`
+  },
+
+  energyprofile: {
+    title: 'Activation energy',
+    caption: 'Reactants must climb a hill before they can become products. A catalyst gives a lower ' +
+             'path over the hill; it never changes where the reaction ends up.',
+    svg: `
+      <svg viewBox="0 0 420 170" role="img" aria-label="An energy profile with and without a catalyst">
+        <line x1="45" y1="140" x2="390" y2="140" class="ax"/>
+        <line x1="45" y1="15" x2="45" y2="145" class="ax"/>
+        <path class="trace solid" d="M55,95 C 130,95 150,25 210,25 C 270,25 290,110 360,110"/>
+        <path class="trace solid alt dashy" d="M55,95 C 140,95 160,58 210,58 C 260,58 280,110 360,110"/>
+        <circle r="6" class="mass climb"/>
+        <text x="60" y="88" class="lbl">reactants</text>
+        <text x="320" y="103" class="lbl">products</text>
+        <text x="150" y="20" class="lbl">without catalyst</text>
+        <text x="228" y="52" class="lbl">with catalyst</text>
+      </svg>`
+  },
+
+  cell: {
+    title: 'A galvanic cell',
+    caption: 'The more reactive metal gives up electrons, which travel through the wire to the other ' +
+             'electrode. Oxidation at the anode, reduction at the cathode.',
+    svg: `
+      <svg viewBox="0 0 420 170" role="img" aria-label="Electrons flowing between two electrodes">
+        <rect x="50" y="60" width="120" height="80" class="beaker"/>
+        <rect x="250" y="60" width="120" height="80" class="beaker"/>
+        <rect x="100" y="35" width="14" height="80" class="wire"/>
+        <rect x="306" y="35" width="14" height="80" class="wire"/>
+        <path class="wirepath" d="M107,35 L107,20 L313,20 L313,35"/>
+        <circle r="5" class="echarge flow"/>
+        <circle r="5" class="echarge flow f2"/>
+        <rect x="170" y="70" width="80" height="16" class="bridge"/>
+        <text x="176" y="82" class="lbl">salt bridge</text>
+        <text x="76" y="158" class="lbl">anode (&#8722;)</text>
+        <text x="286" y="158" class="lbl">cathode (+)</text>
+      </svg>`
+  },
+
+  lattice: {
+    title: 'A unit cell',
+    caption: 'A crystal is one small box repeated in every direction. Counting how much of each corner ' +
+             'and face atom belongs to the box gives the atoms per unit cell.',
+    svg: `
+      <svg viewBox="0 0 420 170" role="img" aria-label="A cubic unit cell">
+        <g class="cube">
+          <rect x="140" y="45" width="90" height="90" class="cellface"/>
+          <rect x="180" y="25" width="90" height="90" class="cellface back"/>
+          <line x1="140" y1="45" x2="180" y2="25" class="ax"/>
+          <line x1="230" y1="45" x2="270" y2="25" class="ax"/>
+          <line x1="140" y1="135" x2="180" y2="115" class="ax"/>
+          <line x1="230" y1="135" x2="270" y2="115" class="ax"/>
+          <circle cx="140" cy="45" r="6" class="mass"/><circle cx="230" cy="45" r="6" class="mass"/>
+          <circle cx="140" cy="135" r="6" class="mass"/><circle cx="230" cy="135" r="6" class="mass"/>
+          <circle cx="180" cy="25" r="6" class="mass"/><circle cx="270" cy="25" r="6" class="mass"/>
+          <circle cx="180" cy="115" r="6" class="mass"/><circle cx="270" cy="115" r="6" class="mass"/>
+        </g>
+        <text x="300" y="70" class="lbl">corner atom</text>
+        <text x="300" y="88" class="lbl">= 1/8 each</text>
+      </svg>`
   }
 };
 
+/* [heading pattern, figure, subjects it may appear under] */
 const MATCHERS = [
-  [/simple harmonic|oscillat|pendulum|loaded spring/i, 'shm'],
-  [/projectile/i, 'projectile'],
-  [/travelling wave|progressive wave|transverse|wave motion|what a wave/i, 'wave'],
-  [/refraction|snell|total internal|through a prism/i, 'refraction'],
-  [/drift|current electricity|electric current/i, 'circuit'],
-  [/circular motion|centripetal|banked|banking/i, 'circular'],
-  [/kinetic energy|potential energy|conservation of (mechanical )?energy|work.energy/i, 'energy'],
-  [/kinetic theory|molecul|mean free path|pressure of a gas|ideal gas/i, 'kinetic'],
-  [/double slit|interference|young|fringe/i, 'ydse'],
-  [/field lines|electric field|coulomb|point charge/i, 'field'],
-  [/induction|faraday|lenz|flux|induced emf/i, 'induction'],
-  [/phasor|alternating|rms|a\.?c\.? circuit/i, 'phasor'],
-  [/electromagnetic wave|displacement current|spectrum of light/i, 'emwave'],
-  [/photoelectric|photon|work function|threshold frequency/i, 'photoelectric'],
-  [/bohr|energy level|spectral series|hydrogen atom|orbit of the electron/i, 'bohr']
+  [/simple harmonic|oscillat|pendulum|loaded spring/i, 'shm', 'Physics'],
+  [/projectile/i, 'projectile', 'Physics'],
+  [/travelling wave|progressive wave|transverse|wave motion|what a wave/i, 'wave', 'Physics'],
+  [/refraction|snell|total internal|through a prism/i, 'refraction', 'Physics'],
+  [/drift velocity|current electricity|electric current/i, 'circuit', 'Physics'],
+  [/circular motion|centripetal|banked|banking/i, 'circular', 'Physics'],
+  [/kinetic energy|potential energy|conservation of (mechanical )?energy|work.energy/i, 'energy', 'Physics'],
+  [/kinetic theory|mean free path|pressure of a gas|ideal gas/i, 'kinetic', 'Physics Chemistry'],
+  [/double slit|interference|young|fringe/i, 'ydse', 'Physics'],
+  [/field lines|electric field|coulomb|point charge/i, 'field', 'Physics'],
+  [/\bfaraday|\blenz|magnetic flux|induced emf|electromagnetic induction/i, 'induction', 'Physics'],
+  [/phasor|alternating current|\brms\b|a\.?c\.? circuit/i, 'phasor', 'Physics'],
+  [/electromagnetic wave|displacement current|spectrum of light/i, 'emwave', 'Physics'],
+  [/photoelectric|\bphoton|work function|threshold frequency/i, 'photoelectric', 'Physics Chemistry'],
+  [/\bbohr|energy level|spectral series|hydrogen atom/i, 'bohr', 'Physics Chemistry'],
+
+  [/derivative|tangent|slope of the curve|differentiat|rate of change/i, 'tangent', 'Maths'],
+  [/integra|area under|antiderivative/i, 'area', 'Maths'],
+  [/unit circle|sine curve|trigonometric ratio|periodic|radian/i, 'unitcircle', 'Maths'],
+  [/conic|parabola|ellipse|hyperbola|eccentricity|directrix/i, 'conic', 'Maths'],
+  [/vector|parallelogram law|triangle law|resultant/i, 'vectors', 'Maths'],
+  [/\blocus\b|equation of a circle/i, 'locus', 'Maths'],
+
+  [/orbital|quantum number|electron cloud|azimuthal/i, 'orbital', 'Chemistry'],
+  [/equilibrium|le chatelier|reversible reaction|forward and backward/i, 'equilibrium', 'Chemistry'],
+  [/activation energy|catalyst|rate of reaction|kinetics|collision theory/i, 'energyprofile', 'Chemistry'],
+  [/galvanic|electrochem|electrode|cell potential|\bredox\b/i, 'cell', 'Chemistry'],
+  [/unit cell|crystal|\blattice\b|packing|solid state/i, 'lattice', 'Chemistry']
 ];
 
 function buildFigure(key) {
@@ -323,9 +558,9 @@ function buildFigure(key) {
   return fig;
 }
 
-/** Insert figures under matching headings. Only for Physics concept pages. */
+/** Insert figures under matching headings, on any subject's concept pages. */
 function decorate(root, subject, fileKey) {
-  if (subject !== 'Physics' || fileKey !== '01-concepts') return;
+  if (fileKey !== '01-concepts' && fileKey !== '00-mindmap') return;
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
   const used = new Set();
@@ -333,8 +568,8 @@ function decorate(root, subject, fileKey) {
   for (const h of root.querySelectorAll('h1, h2')) {
     if (added >= 4) break;
     const text = h.textContent || '';
-    for (const [re, key] of MATCHERS) {
-      if (used.has(key) || !re.test(text)) continue;
+    for (const [re, key, subjects] of MATCHERS) {
+      if (used.has(key) || !subjects.includes(subject) || !re.test(text)) continue;
       h.insertAdjacentElement('afterend', buildFigure(key));
       used.add(key);
       added++;

@@ -152,6 +152,24 @@ function applyRules(s) {
 const MATHY = new RegExp(
   '[=^]|\\bsqrt|&lt;=|&gt;=|\\bINT\\b|--?&gt;|\\+\\/-|\\b(' + Object.keys(GREEK).join('|') + ')\\b');
 
+const unesc = (s) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+
+/** Set an expression with KaTeX when it can be read as LaTeX, otherwise fall
+ *  back to the plain HTML typesetter. `display` stacks fractions full size. */
+function math(raw, display) {
+  if (window.Tex && window.katex) {
+    const tex = window.Tex.toTeX(raw);
+    if (tex) {
+      try {
+        return window.katex.renderToString(tex, {
+          displayMode: !!display, throwOnError: true, strict: false
+        });
+      } catch (e) { /* not valid after all: fall through */ }
+    }
+  }
+  return typesetInline(raw);
+}
+
 function typesetInline(raw) {
   let s = esc(raw);
   // The notes use backticks for inline maths as well as for literal code, so
@@ -160,7 +178,7 @@ function typesetInline(raw) {
   s = s.replace(/`([^`]+)`/g, (_, code) => {
     const isMath = MATHY.test(code) && !/\.(md|ps1|js|py|cmd)\b/.test(code);
     held.push(isMath
-      ? '<span class="imath">' + applyRules(code) + '</span>'
+      ? '<span class="imath">' + math(unesc(code)) + '</span>'
       : '<code>' + code + '</code>');
     return '\u0000' + (held.length - 1) + '\u0000';
   });
@@ -281,7 +299,9 @@ function fractionAt(lines, i) {
   const lead = [label, cur.slice(0, first).trim()].filter(Boolean).join(' ');
   const last = runs[runs.length - 1][1];
   return {
-    html: (lead ? typesetInline(lead) + ' ' : '') + html,
+    html: runs.length === 1
+      ? fracRow(lead, seg(prev, runs[0][0], runs[0][1]), seg(next, runs[0][0], runs[0][1]))
+      : (lead ? typesetInline(lead) + ' ' : '') + html,
     rhs: [cur.slice(last).trim(), prev.slice(last).trim(), next.slice(last).trim()]
       .filter(Boolean).join('  ')
   };
@@ -290,6 +310,23 @@ function fractionAt(lines, i) {
 const frac = (n, d) =>
   '<span class="frac"><span class="num">' + typesetInline(n) +
   '</span><span class="den">' + typesetInline(d) + '</span></span>';
+
+/** A whole "lhs = num/den" row, set by KaTeX when every part converts. */
+function fracRow(lhs, num, den) {
+  if (window.Tex && window.katex) {
+    const L = lhs ? window.Tex.toTeX(lhs, true) : '';
+    const N = window.Tex.toTeX(num, true);
+    const D = window.Tex.toTeX(den, true);
+    if ((!lhs || L) && N && D) {
+      try {
+        return window.katex.renderToString(
+          (L ? L + ' ' : '') + '\\dfrac{' + N + '}{' + D + '}',
+          { throwOnError: true, strict: false });
+      } catch (e) { /* fall through */ }
+    }
+  }
+  return (lhs ? typesetInline(lhs) + ' ' : '') + frac(num, den);
+}
 
 /* ---------------------------------------------------------------- blocks */
 
@@ -361,7 +398,7 @@ function asciiTable(lines) {
   if (cur.length) groups.push(cur);
   if (!groups.length) return null;
 
-  const cell = (c, tag) => '<' + tag + '>' + typesetInline(c) + '</' + tag + '>';
+  const cell = (c, tag) => '<' + tag + '>' + math(c) + '</' + tag + '>';
   const head = groups.length > 1
     ? '<thead>' + groups[0].map((r) => '<tr>' + r.map((c) => cell(c, 'th')).join('') + '</tr>').join('') + '</thead>'
     : '';
@@ -537,11 +574,11 @@ function outlineTree(lines) {
     const { label, value } = outlineSplit(it.text);
     const val = [value].concat(it.cont).filter(Boolean).join('   ');
     if (val) hasVal = true;
-    const math = !val && label.includes('=') ? ' math' : '';
-    const lab = '<div class="ol-lab' + math + (val ? '' : ' wide') + '" style="--lvl:' + it.lvl + '">' +
+    const mathCls = !val && label.includes('=') ? ' math' : '';
+    const lab = '<div class="ol-lab' + mathCls + (val ? '' : ' wide') + '" style="--lvl:' + it.lvl + '">' +
       '<span class="ol-b">' + BULLET[Math.min(it.lvl, BULLET.length - 1)] + '</span>' +
-      '<span>' + typesetInline(label) + '</span></div>';
-    return val ? lab + '<div class="ol-val">' + typesetInline(val) + '</div>' : lab;
+      '<span>' + (mathCls ? math(label) : typesetInline(label)) + '</span></div>';
+    return val ? lab + '<div class="ol-val">' + math(val) + '</div>' : lab;
   }).join('');
 
   return '<div class="outline' + (hasVal ? '' : ' solo') + '">' + html + '</div>';
@@ -603,7 +640,7 @@ function renderBlock(code) {
       const tail = splitRow(fr.rhs);
       rows.push({
         expr: fr.html,
-        note: [tail.expr, tail.note].filter(Boolean).map(typesetInline).join('  ')
+        note: [tail.expr, tail.note].filter(Boolean).map((t) => math(t)).join('  ')
       });
       i += 3;
       continue;
@@ -626,7 +663,7 @@ function renderBlock(code) {
     // own; "2 H2" is a formula, not a heading
     const caption = !note && !expr.includes('=') && !/[a-z]/.test(expr) &&
       (expr.match(/[A-Z]/g) || []).length >= 4;
-    rows.push({ expr: typesetInline(expr), note: note ? typesetInline(note) : '', caption });
+    rows.push({ expr: math(expr), note: note ? math(note) : '', caption });
     i++;
   }
 
