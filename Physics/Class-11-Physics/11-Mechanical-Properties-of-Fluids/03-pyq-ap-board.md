@@ -970,16 +970,20 @@ a sphere falling through a viscous fluid. Draw the velocity-time graph.
 **ANSWER:**
 ```
   STOKES' LAW :   F  =  6 pi eta r v
+```
 
   FORCES ON THE SPHERE
 
+```
            ^ Fv = 6 pi eta r v      (viscous drag, UP)
            ^ U  = (4/3) pi r^3 sigma g   (upthrust, UP)
         +-----+
         |  o  |    radius r , density rho
         +-----+
            v W  = (4/3) pi r^3 rho g     (weight, DOWN)
+```
 
+```
   At the TERMINAL velocity the net force is zero:
 
         W   =   U   +   Fv
@@ -993,13 +997,17 @@ a sphere falling through a viscous fluid. Draw the velocity-time graph.
    3
 
   Cancelling pi r :
+```
 
+```
   +-------------------------------------------------+
   |                 2  r^2 ( rho - sigma ) g        |
   |      v_t   =   ----------------------------     |
   |                          9  eta                 |
   +-------------------------------------------------+
+```
 
+```
   VELOCITY - TIME GRAPH
 
     v
@@ -1977,7 +1985,9 @@ Define Reynolds number and state its significance.
         |  o  |  sphere : radius r , density rho
         +-----+
            v W  = (4/3) pi r^3 rho g
+```
 
+```
   At the terminal velocity the net force is ZERO :
 
         W  =  U  +  Fv
@@ -1989,13 +1999,17 @@ Define Reynolds number and state its significance.
    4
    - pi r^3 g ( rho - sigma )  =  6 pi eta r v_t
    3
+```
 
+```
   +-------------------------------------------------+
   |                 2  r^2 ( rho - sigma ) g        |
   |      v_t   =   ----------------------------     |
   |                          9  eta                 |
   +-------------------------------------------------+
+```
 
+```
     v
     ^
     |                        __________________ v_t

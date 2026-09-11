@@ -160,9 +160,11 @@ Copy this by hand into a notebook. Writing it once beats reading it ten times.
   |   a_centripetal =  r omega^2  =  v^2 / r                           |
   |                                                                    |
   +--------------------------------------------------------------------+
+```
 
   EQUATIONS OF ROTATIONAL MOTION (constant alpha)
 
+```
   +----------------------------------+---------------------------------+
   |  LINEAR                          |  ROTATIONAL                     |
   +----------------------------------+---------------------------------+

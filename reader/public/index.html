@@ -3,16 +3,24 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AP Inter MPC — Reader</title>
+<title>Solo Learning</title>
 <link rel="stylesheet" href="vendor/katex/katex.min.css">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="home.css">
+<link rel="stylesheet" href="landing.css">
+<link rel="stylesheet" href="mascot.css">
+<link rel="stylesheet" href="solo.css">
 </head>
 <body>
 
 <header class="bar">
   <button id="menu" class="icon" title="Chapters">☰</button>
-  <a class="brand" href="#">AP Inter MPC</a>
-  <input id="find" type="search" placeholder="Search chapters and topics    /" autocomplete="off">
+  <a class="brand" href="#"><span class="brand-mark">SL</span>Solo <b>Learning</b></a>
+  <div class="find-wrap">
+    <span class="find-ico">⌕</span>
+    <input id="find" type="search" placeholder="Search any chapter or topic" autocomplete="off">
+    <kbd>/</kbd>
+  </div>
   <div class="spacer"></div>
   <button id="zoomOut" class="icon" title="Smaller diagrams">A−</button>
   <button id="zoomIn" class="icon" title="Larger diagrams">A+</button>
@@ -20,26 +28,11 @@
 </header>
 
 <div id="hits" class="hits" hidden></div>
+<p id="rootline" hidden></p>
 
 <div class="shell">
   <nav id="side" class="side"></nav>
-  <main id="main" class="main">
-    <div class="welcome">
-      <h1>AP Inter MPC notes</h1>
-      <p id="rootline" class="dim"></p>
-      <p>Pick a chapter on the left. Every chapter has a mind map, concepts,
-         formulae, board previous-year questions, JEE / EAPCET questions and
-         question patterns.</p>
-      <div class="legend">
-        <div><code>x^2</code> <span>→</span> <b>x<sup>2</sup></b></div>
-        <div><code>sqrt(l/g)</code> <span>→</span> <b class="sqrt">√<span class="rad">l/g</span></b></div>
-        <div><code>theta</code> <span>→</span> <b>θ</b></div>
-        <div><code>H2SO4</code> <span>→</span> <b>H<sub>2</sub>SO<sub>4</sub></b></div>
-        <div><code>3d5</code> <span>→</span> <b>3d<sup>5</sup></b></div>
-        <div><code>&lt;=</code> <span>→</span> <b>≤</b></div>
-      </div>
-    </div>
-  </main>
+  <main id="main" class="main"></main>
   <aside id="toc" class="toc"></aside>
 </div>
 
@@ -49,5 +42,9 @@
 <script src="md.js"></script>
 <script src="anim.js"></script>
 <script src="app.js"></script>
+<script src="toc.js"></script>
+<script type="module" src="home.js"></script>
+<script type="module" src="solo.js"></script>
+<script type="module" src="landing.js"></script>
 </body>
 </html>

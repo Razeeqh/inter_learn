@@ -1820,7 +1820,9 @@ and one example for each.
              a soluble salt of the metal = ELECTROLYTE.
              The metal dissolves from the anode and plates out pure on
              the cathode.
+```
 
+```
           (+) impure Cu ANODE          CATHODE (-) pure Cu strip
               ||                              ||
         +-----||------------------------------||-----+
@@ -1828,7 +1830,9 @@ and one example for each.
         |  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  |
         |     , ANODE MUD ,   <-- Ag, Au, Pt, Se, Te |
         +---------------------------------------------+
+```
 
+```
       ANODE   :  Cu    -->   Cu2+  +  2 e-
       CATHODE :  Cu2+  +  2 e-  -->   Cu     (99.95 % pure)
 

@@ -191,6 +191,9 @@ function typesetInline(raw) {
 
 const pad = (l, n) => (l.length >= n ? l : l + ' '.repeat(n - l.length));
 
+/** Border runs that belong to a neighbouring box, not to this text. */
+const dropFrames = (t) => t.replace(/\+[-=]{2,}\+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+
 /** One horizontal band that may hold SEVERAL matrices side by side, each with
  *  its own height, plus the labels sitting between them ("P =", "Q ="). */
 function matrixBandAt(lines, i) {
@@ -238,11 +241,58 @@ function matrixBandAt(lines, i) {
   const last = parts[parts.length - 1].sp.e;
   const notes = [];
   for (let j = i; j < end; j++) {
-    const t = (lines[j] || '').slice(last).trim();
+    const t = dropFrames((lines[j] || '').slice(last));
     if (t) notes.push(t);
   }
 
   return { end, html, notes };
+}
+
+/** Matrices drawn with bars only, no +---+ border, one or more side by side:
+ *      A =  | 1   2 |     B =  | 5   6 |
+ *           | 3   4 |          | 7   8 | */
+function barMatrixAt(lines, i) {
+  const barsIn = (l) => {
+    const out = [];
+    for (let k = 0; k < l.length; k++) if (l[k] === '|') out.push(k);
+    return out;
+  };
+  const cols = barsIn(lines[i] || '');
+  if (cols.length < 2 || cols.length % 2) return null;
+
+  const spans = [];
+  for (let k = 0; k < cols.length; k += 2) spans.push({ s: cols[k], e: cols[k + 1] });
+
+  const rowsBySpan = spans.map(() => []);
+  let j = i;
+  for (; j < lines.length; j++) {
+    const c = barsIn(lines[j] || '');
+    if (c.length !== cols.length || c.some((v, k) => v !== cols[k])) break;
+    spans.forEach((sp, k) =>
+      rowsBySpan[k].push(lines[j].slice(sp.s + 1, sp.e).trim().split(/\s{2,}/).filter((t) => t !== '')));
+  }
+  if (j - i < 2) return null;                   // one row of bars is an absolute value
+
+  for (const rows of rowsBySpan) {
+    const w = rows[0].length;
+    if (w < 2 || !rows.every((r) => r.length === w)) return null;
+    if (rows.some((r) => r.some((c) => c.length > 14))) return null;
+  }
+
+  let html = '';
+  spans.forEach((sp, k) => {
+    const from = k ? spans[k - 1].e + 1 : 0;
+    let label = '';
+    for (let r = i; r < j && !label; r++) label = pad(lines[r], sp.s).slice(from, sp.s).trim();
+    html += '<span class="matgroup">' +
+      (label ? '<span class="matlabel">' + math(label) + '</span>' : '') +
+      renderMatrix(rowsBySpan[k]) + '</span>';
+  });
+
+  const last = spans[spans.length - 1].e + 1;
+  const note = lines.slice(i, j).map((l) => dropFrames((l || '').slice(last)))
+    .filter(Boolean).join('  ');
+  return { end: j, html, note: note ? typesetInline(note) : '' };
 }
 
 function renderMatrix(rows) {
@@ -260,6 +310,17 @@ function fractionAt(lines, i) {
   const prev = lines[i - 1];
   const next = lines[i + 1];
   if (prev === undefined || next === undefined) return null;
+  // A bar beside a matrix is that matrix's bracket, not a fraction line. Bars
+  // that pair up around one term are absolute values, and those are allowed.
+  const bracket = (l) => {
+    const t = (l || '').trim();
+    const n = (t.match(/\|/g) || []).length;
+    if (!n) return false;
+    if (n % 2 === 1) return true;                    // an unmatched bracket bar
+    // an absolute value hugs a short term; a matrix row does not
+    return !/\|[^|]{1,14}\|/.test(t) || /\s{3,}/.test(t);
+  };
+  if (bracket(prev) || bracket(cur) || bracket(next)) return null;
 
   const runs = [];
   const re = /-{3,}/g;
@@ -305,8 +366,8 @@ function fractionAt(lines, i) {
     html: runs.length === 1
       ? fracRow(lead, seg(prev, runs[0][0], runs[0][1]), seg(next, runs[0][0], runs[0][1]))
       : (lead ? typesetInline(lead) + ' ' : '') + html,
-    rhs: [cur.slice(last).trim(), prev.slice(last).trim(), next.slice(last).trim()]
-      .filter(Boolean).join('  ')
+    rhs: [cur.slice(last), prev.slice(last), next.slice(last)]
+      .map(dropFrames).filter(Boolean).join('  ')
   };
 }
 
@@ -342,6 +403,9 @@ function isArt(lines) {
     if (/\|-{2,}|-{2,}\|/.test(l)) return true;    // boxes joined by arrows
     if (/\+-+\+-+\+/.test(l)) return true;         // tree connector or grid rule
     if (/-{3,}\+-{3,}/.test(l)) return true;       // a drawn axis crossing
+    if (/[^-+\s][^+]*-{2,}\+\s*$/.test(l)) return true;   // a drawn corner after text
+    if (/-{2,}\+-{2,}/.test(l)) return true;       // a drawn junction
+    if (/\+-{4,}[^+]*$/.test(l)) return true;      // a long rule that never closes
     if (/\+-{2,}>/.test(l)) return true;           // a drawn axis with an arrow head
     if (/\+-{2,}/.test(l) && />\s*[A-Za-z]?\s*$/.test(l)) return true;   // axis with points on it
     if (/\*{2,}/.test(l)) return true;             // a plotted curve
@@ -359,16 +423,18 @@ function asciiTable(lines) {
   const all = lines.filter((l) => l.trim() !== '');
   const edge = (l) => /^\s*\+[-+]+\+\s*$/.test(l) && (l.match(/\+/g) || []).length > 2;
 
-  // a sentence may introduce or follow the table; it is kept, not thrown away
+  // A sentence may introduce or follow the table; it is kept, not thrown away.
+  // A plus inside it is arithmetic unless it is drawing a rule.
+  const structural = (l) => /\|/.test(l) || /\+[-=]{2,}|[-=]{2,}\+/.test(l);
   let from = 0;
   while (from < all.length && !edge(all[from])) {
-    if (/[|+]/.test(all[from])) return null;
+    if (structural(all[from])) return null;
     from++;
   }
   if (from >= all.length) return null;
   let to = all.length;
   while (to > from && !edge(all[to - 1]) && !/^\s*\|/.test(all[to - 1])) {
-    if (/[|+]/.test(all[to - 1])) return null;
+    if (structural(all[to - 1])) return null;
     to--;
   }
   const lead = all.slice(0, from);
@@ -400,6 +466,10 @@ function asciiTable(lines) {
   }
   if (cur.length) groups.push(cur);
   if (!groups.length) return null;
+  // cells holding wires, hatching or rules are a drawing laid out in a grid
+  if (groups.some((g) => g.some((r) => r.some((c) => /-{2,}|~{2,}|\|{2,}|_{2,}/.test(c))))) {
+    return null;
+  }
 
   const cell = (c, tag) => '<' + tag + '>' + math(c) + '</' + tag + '>';
   const head = groups.length > 1
@@ -415,16 +485,20 @@ function asciiTable(lines) {
 }
 
 /** Split "formula          note" into its two columns.
- *  The gap that starts the note is looked for AFTER the last '=', so that wide
- *  spacing used inside a formula does not chop the formula in half. */
+ *  The gap that starts the note is looked for AFTER the first '=', and never
+ *  between a pair of bars, so a matrix row is not cut in half. */
 function splitRow(line) {
   const t = line.trim();
   const eq = t.indexOf('=');
   const from = eq >= 0 ? eq + 1 : 0;
-  const m = /\s{3,}/.exec(t.slice(from));
-  if (!m) return { expr: t, note: '' };
-  const at = from + m.index;
-  return { expr: t.slice(0, at).trim(), note: t.slice(at).trim() };
+  let inBars = false;
+  for (let i = from; i < t.length; i++) {
+    if (t[i] === '|') { inBars = !inBars; continue; }
+    if (!inBars && /^\s{3,}/.test(t.slice(i))) {
+      return { expr: t.slice(0, i).trim(), note: t.slice(i).trim() };
+    }
+  }
+  return { expr: t, note: '' };
 }
 
 const DIVIDER = '\u0001';
@@ -462,7 +536,7 @@ function unframe(lines) {
     }
     out.push(l);                       // a heading sitting between two panels
   }
-  if (barred < 2) return null;
+  if (!barred) return null;
   out.push.apply(out, body.slice(last + 1));
   return out.length ? out : null;
 }
@@ -616,9 +690,65 @@ function artBlock(lines) {
          lines.map((l) => artInline(esc(l))).join('\n') + '</pre>';
 }
 
+/** Is this single line part of a drawing? Same tests as isArt, one line at a time. */
+function isDrawnLine(l) {
+  return isArt([l]) && l.trim() !== '';
+}
+
+/** Split a block into runs of drawing and runs of text, so one diagram inside an
+ *  explanation does not force the whole explanation into monospace. */
+function segments(lines) {
+  const drawn = lines.map(isDrawnLine);
+
+  // a blank line belongs to the picture only if it is inside one
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim()) continue;
+    drawn[i] = Boolean(drawn[i - 1]) && Boolean(drawn[i + 1]);
+  }
+  // a couple of label lines inside a picture are part of it
+  for (let i = 0; i < lines.length; i++) {
+    if (drawn[i]) continue;
+    let j = i;
+    while (j < lines.length && !drawn[j]) j++;
+    if (j - i <= 2 && i > 0 && j < lines.length) for (let k = i; k < j; k++) drawn[k] = true;
+    i = j - 1;
+  }
+
+  const segs = [];
+  for (let i = 0; i < lines.length;) {
+    let j = i;
+    while (j < lines.length && drawn[j] === drawn[i]) j++;
+    segs.push({ art: drawn[i], lines: lines.slice(i, j) });
+    i = j;
+  }
+  return segs.filter((s) => s.lines.some((l) => l.trim()));
+}
+
+/** Render as a card, unless doing so would print box drawing, in which case the
+ *  lines were a picture after all. */
+function cardOrArt(lines) {
+  const html = renderRows(lines, lines.join('\n'));
+  const text = html.replace(/<[^>]+>/g, ' ');
+  // A leaked frame bar is unmatched inside its cell, or wraps a whole equation.
+  // Bars that pair up around a short term are absolute values and are fine.
+  const cells = [];
+  const CELL = /<div class="(?:expr|cap)[^"]*">([\s\S]*?)<\/div>/g;
+  let m;
+  while ((m = CELL.exec(html)) !== null) cells.push(m[1].replace(/<[^>]+>/g, '').trim());
+  const stray = cells.filter((c) => {
+    if (!/^\|/.test(c) || !/\|$/.test(c)) return false;
+    // a lone pair of bars around a whole equation is a frame; bars that pair up
+    // around short terms are absolute values
+    return (c.match(/\|/g) || []).length === 2 && c.length > 20;
+  }).length;
+  const leaks = /\+--|--\+|\+==|==\+/.test(text) ||
+    (stray >= 2 && !/class="mat"/.test(html));
+  return leaks ? artBlock(prettyTree(lines) || lines) : html;
+}
+
 function renderBlock(code) {
   const raw = code.replace(/\r/g, '').replace(/\s+$/, '');
-  let lines = raw.split('\n');
+  const lines = raw.split('\n');
 
   const table = asciiTable(lines);
   if (table) return table;
@@ -626,9 +756,24 @@ function renderBlock(code) {
   const outline = outlineTree(lines);
   if (outline) return outline;
 
-  if (isArt(lines)) {
-    return artBlock(prettyTree(lines) || lines);
+  const segs = segments(lines);
+  if (segs.length > 1) {
+    // mostly picture: the odd label line between the strokes belongs to it
+    const body = lines.filter((l) => l.trim());
+    const drawn = body.filter(isDrawnLine).length;
+    if (drawn / body.length >= 0.4) return artBlock(prettyTree(lines) || lines);
+
+    return segs.map((s) => (s.art
+      ? artBlock(prettyTree(s.lines) || s.lines)
+      : cardOrArt(s.lines))).join('');
   }
+
+  if (isArt(lines)) return artBlock(prettyTree(lines) || lines);
+  return cardOrArt(lines);
+}
+
+function renderRows(input, raw) {
+  let lines = input;
 
   // a callout box is unframed first; a bare matrix box is left for the parser
   let framed = false;
@@ -651,6 +796,14 @@ function renderBlock(code) {
       sawStructure = true;
       rows.push({ expr: mat.html, note: mat.notes.map(typesetInline).join('<br>') });
       i = mat.end;
+      continue;
+    }
+
+    const bar = barMatrixAt(lines, i);
+    if (bar) {
+      sawStructure = true;
+      rows.push({ expr: bar.html, note: bar.note });
+      i = bar.end;
       continue;
     }
 

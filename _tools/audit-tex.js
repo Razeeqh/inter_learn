@@ -9,7 +9,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 global.window = {};
 eval(fs.readFileSync(path.join(ROOT, 'reader/public/tex.js'), 'utf8'));
-const katex = require(path.join(process.env.TEMP, 'package/dist/katex.min.js'));
+const katex = require(path.join(ROOT, 'reader/public/vendor/katex/katex.min.js'));
 const Tex = window.Tex;
 
 const SUBJECTS = ['Maths', 'Physics', 'Chemistry'];
@@ -28,6 +28,8 @@ const files = SUBJECTS.flatMap((s) => walk(path.join(ROOT, s)));
 
 let seen = 0, converted = 0, broke = 0;
 const bad = [];
+const reasons = {};
+const samples = {};
 
 for (const file of files) {
   const rel = path.relative(ROOT, file).replace(/\\/g, '/');
@@ -49,7 +51,13 @@ for (const file of files) {
     for (const c of candidates) {
       seen++;
       const tex = Tex.toTeX(c);
-      if (!tex) continue;
+      if (!tex) {
+        const r = Tex.why(c) || 'other';
+        reasons[r] = (reasons[r] || 0) + 1;
+        if (!samples[r]) samples[r] = [];
+        if (samples[r].length < 4) samples[r].push(c.slice(0, 90));
+        continue;
+      }
       converted++;
       try {
         katex.renderToString(tex, { throwOnError: true, strict: false });
@@ -63,6 +71,14 @@ for (const file of files) {
 
 console.log(`expressions seen ${seen}   converted to LaTeX ${converted}` +
   `  (${(100 * converted / seen).toFixed(1)}%)   KaTeX errors ${broke}`);
+
+if (process.argv.includes('--why')) {
+  console.log('\nnot converted, by reason:');
+  for (const [k, v] of Object.entries(reasons).sort((a, b) => b[1] - a[1])) {
+    console.log(`${String(v).padStart(7)}  ${k}`);
+    for (const s of samples[k] || []) console.log(`           ${JSON.stringify(s)}`);
+  }
+}
 
 if (show) {
   for (const b of bad.slice(0, 25)) {

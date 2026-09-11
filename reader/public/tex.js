@@ -176,7 +176,9 @@ function words(s) {
     if (/^d[xytrsuv]$/.test(w)) return hold('\\,\\mathrm{d}' + w[1]);   // a differential
     if (PLAIN.includes(w)) return hold('\\text{ ' + w + ' }');
     if (w.length > 1 && /[A-Z]/.test(w)) return hold('\\mathrm{' + w + '}');   // a name
-    return w;                                        // single letters, or a product like 4ac
+    // four letters or more is an English word, not a product like 4ac
+    if (w.length >= 4) return hold('\\text{ ' + w + ' }');
+    return w;
   });
 }
 
@@ -220,6 +222,10 @@ function stack(chunk) {
 /** A term with no relation in it. */
 function expr(src, fail) {
   let s = src.replace(/\s{3,}/g, () => ' ' + hold('\\quad') + ' ');   // a laid out gap
+  s = s.replace(/\^(\w+)'/g, (_, e) => hold('^{' + e + '\\prime}'));
+  s = s.replace(/([A-Za-z0-9)\]])'\^(\w+)/g, (_, b, e) => b + hold('^{\\prime ' + e + '}'));
+  s = s.replace(/([A-Za-z0-9)\]])'/g, (_, b) => b + hold('^{\\prime}'));   // transpose
+  s = s.replace(/\{/g, () => hold('\\{')).replace(/\}/g, () => hold('\\}'));   // a set
   for (const [from, tex] of INFIX) s = s.split(from).join(' ' + hold(tex) + ' ');
 
   s = chemistry(s);
@@ -228,26 +234,44 @@ function expr(src, fail) {
   s = calls(s, fail);
   s = scripts(s, fail);
   s = s.replace(/\b([A-Za-z])(\d{1,2})(?![\d}_])/g, '$1_{$2}');   // x1, a11
+  // "m x n", "2 x 3"; twice, as the first pass eats the middle operand
+  for (let pass = 0; pass < 2; pass++) {
+    s = s.replace(/\b([A-Za-z0-9]{1,3})\s+x\s+([A-Za-z0-9]{1,3})\b/g,
+      (_, a, b) => a + ' ' + hold('\\times') + ' ' + b);
+  }
+  s = s.replace(/\b(\d)x(\d)\b/g, (_, a, b) => a + hold('\\times') + b);
   s = words(s);
 
   s = terms(s).map((t) => (t === '+' || t === '-' ? ' ' + t + ' ' : stack(t))).join('');
   return s.replace(/\s+/g, ' ').trim();
 }
 
+/* Reasons an expression is not attempted. Kept as a list so the audit can
+ * report which one fired. */
+const GUARDS = [
+  ['empty', (t) => !t],
+  ['tooLong', (t) => t.length > 220],
+  ['unbalanced', (t) => !isBalanced(t)],
+  ['markup', (t) => /[\\$&#%~@]/.test(t)],
+  ['needsParser', (t) => /\b(lim|integral|matrix)\b/i.test(t)],
+  // an apostrophe is a transpose or a derivative only when it follows a symbol;
+  // loose ones are drawn arcs or quoted words
+  ['looseQuote', (t) => /(^|[^A-Za-z0-9)\]])'/.test(t)],
+  ['blanks', (t) => (t.match(/(?:^|[\s(])_/g) || []).length >= 2],
+  ['axisArrows', (t) => (t.match(/(?:^|\s)\^/g) || []).length >= 2],
+  // bars plus column spacing means a matrix row; LaTeX would eat the gaps
+  ['matrixRow', (t) => /\|/.test(t) && /\s{2,}/.test(t)],
+  ['sentence', (t) => /[a-z]{3,}\s+[a-z]{3,}\s+[a-z]{3,}/.test(t)],
+  // mostly English: better set as prose than as a product of italic letters
+  ['wordy', (t) => (t.match(/\b[a-z]{2,}\b/g) || [])
+    .filter((w) => !FUNCS[w] && !GREEK_TEX[w] && !/^d[xytrsuv]$/.test(w)).length >= 4]
+];
+
 /** Convert one expression. Returns null when the text is prose or unparseable.
  *  `loose` accepts a bare fragment such as a numerator, which has no operator. */
 function toTeX(src, loose) {
   const text = String(src).trim();
-  if (!text || text.length > 220) return null;
-  if (!isBalanced(text)) return null;
-  if (/[\\{}$&#%~@]/.test(text)) return null;                 // already markup
-  if (/\b(lim|integral|matrix)\b/i.test(text)) return null;   // needs a real parser
-  if (/''|\.'/.test(text)) return null;                       // drawn with punctuation
-  if (/(^|[\s(])'/.test(text)) return null;                   // a drawn arc, not a prime
-  if ((text.match(/(?:^|[\s(])_/g) || []).length >= 2) return null;   // blanks in a diagram
-  if ((text.match(/(?:^|\s)\^/g) || []).length >= 2) return null;     // drawn axis arrows
-  if ((text.match(/'/g) || []).length >= 2) return null;              // repeated primes
-  if (/[a-z]{3,}\s+[a-z]{3,}\s+[a-z]{3,}/.test(text)) return null;   // a sentence
+  for (const [, test] of GUARDS) if (test(text)) return null;
   if (!loose && !/[=+\-*/^_<>]|\bsqrt\b|\bINT\b|\bSUM\b/.test(text)) return null;
 
   HELD = [];
@@ -260,4 +284,12 @@ function toTeX(src, loose) {
   return /[^\s]/.test(tex) ? tex : null;
 }
 
-window.Tex = { toTeX };
+/** Which guard stopped this expression, for the audit. */
+function why(src) {
+  const text = String(src).trim();
+  for (const [name, test] of GUARDS) if (test(text)) return name;
+  if (!/[=+\-*/^_<>]|\bsqrt\b|\bINT\b|\bSUM\b/.test(text)) return 'noOperator';
+  return toTeX(text) ? null : 'parseFailed';
+}
+
+window.Tex = { toTeX, why };

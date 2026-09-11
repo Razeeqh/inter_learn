@@ -1,0 +1,102 @@
+/* Library home. Scoped to .hm so the reading pages are untouched. */
+
+.hm { margin: -8px 0 40px; }
+
+/* ------------------------------------------------------------------- hero */
+
+.hm-hero {
+  position: relative; overflow: hidden;
+  border-radius: 20px; margin-bottom: 22px;
+  background: linear-gradient(135deg, #16214a 0%, #0d1428 55%, #0a0f20 100%);
+  box-shadow: 0 16px 40px rgba(10, 20, 45, .22);
+}
+.hm-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: .95; }
+.hm-hero-in {
+  position: relative; z-index: 2;
+  padding: clamp(28px, 5vw, 54px);
+  background: linear-gradient(90deg, rgba(8, 12, 26, .82) 0%, rgba(8, 12, 26, .55) 60%, transparent 100%);
+}
+.hm-kick {
+  margin: 0 0 10px; font-family: var(--sans); font-size: 11px; font-weight: 700;
+  letter-spacing: .24em; text-transform: uppercase; color: #8fa8de;
+}
+.hm-title {
+  margin: 0 0 26px; font-family: var(--sans); font-size: clamp(24px, 3.4vw, 40px);
+  line-height: 1.12; letter-spacing: -.025em; font-weight: 800; color: #fff;
+}
+.hm-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.hm-btn {
+  font-family: var(--sans); font-size: 14px; font-weight: 650; text-decoration: none;
+  padding: 12px 20px; border-radius: 999px; color: #fff;
+  background: color-mix(in srgb, var(--c) 88%, black);
+  border: 1px solid color-mix(in srgb, var(--c) 60%, white);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--c) 42%, transparent);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+.hm-btn:hover { transform: translateY(-3px); box-shadow: 0 14px 30px color-mix(in srgb, var(--c) 55%, transparent); }
+
+/* ----------------------------------------------------------------- resume */
+
+.hm-resume {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 16px 20px; margin-bottom: 22px; border-radius: 14px; text-decoration: none;
+  background: var(--accent-soft); border: 1px solid var(--accent);
+  font-family: var(--sans);
+}
+.hm-resume span { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+.hm-resume b { font-size: 16px; color: var(--ink); }
+.hm-resume em { font-style: normal; margin-left: auto; font-size: 13.5px; color: var(--accent); }
+
+/* ------------------------------------------------------------------ cards */
+
+.hm-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 34px; }
+.hm-card {
+  padding: 22px; border-radius: 16px;
+  background: var(--panel); border: 1px solid var(--line);
+  border-top: 4px solid var(--c);
+  box-shadow: 0 2px 10px rgba(10, 20, 40, .05);
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+.hm-card:hover { transform: translateY(-4px); box-shadow: 0 14px 30px rgba(10, 20, 40, .12); }
+.hm-card header { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+.hm-orb {
+  width: 38px; height: 38px; border-radius: 12px; flex: none;
+  background: radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--c) 55%, white), var(--c));
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--c) 45%, transparent);
+  animation: hmFloat 4s ease-in-out infinite;
+}
+.hm-card h3 { margin: 0; font-family: var(--sans); font-size: 15px; letter-spacing: .1em; color: var(--ink); }
+.hm-card header p { margin: 2px 0 0; font-family: var(--sans); font-size: 12.5px; color: var(--dim); }
+.hm-line { margin: 0 0 14px; font-family: var(--sans); font-size: 13.5px; line-height: 1.55; color: var(--dim); }
+.hm-chips { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.hm-chips a {
+  display: inline-block; font-family: var(--sans); font-size: 12px; text-decoration: none;
+  padding: 5px 11px; border-radius: 999px; color: var(--dim);
+  background: var(--soft); border: 1px solid var(--line);
+}
+.hm-chips a:hover { color: var(--c); border-color: var(--c); }
+.hm-go {
+  display: inline-block; font-family: var(--sans); font-size: 13.5px; font-weight: 650;
+  text-decoration: none; color: var(--c);
+}
+
+/* -------------------------------------------------------------------- how */
+
+.hm-how h2 {
+  margin: 0 0 16px; font-family: var(--sans); font-size: 17px; font-weight: 750;
+  letter-spacing: -.01em; color: var(--ink);
+}
+.hm-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.hm-steps div {
+  padding: 16px 16px 14px; border-radius: 12px;
+  background: var(--soft); border: 1px solid var(--line); font-family: var(--sans);
+}
+.hm-steps i { font-style: normal; font-size: 11px; letter-spacing: .12em; color: var(--accent); }
+.hm-steps b { display: block; margin: 6px 0 3px; font-size: 14px; color: var(--ink); }
+.hm-steps span { font-size: 12.5px; color: var(--dim); }
+
+@keyframes hmFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .hm-orb { animation: none; }
+}

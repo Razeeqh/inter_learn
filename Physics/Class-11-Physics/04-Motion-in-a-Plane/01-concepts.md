@@ -769,9 +769,11 @@ arrows on top of the letters.
   |      or   r  =  r0  +  u t  +  (1/2) a t^2                           |
   |                                                                      |
   +----------------------------------------------------------------------+
+```
 
   These VECTOR equations split into TWO INDEPENDENT SETS of scalar equations:
 
+```
   +------------------------------+------------------------------+
   |   ALONG x                    |   ALONG y                    |
   +------------------------------+------------------------------+
@@ -779,7 +781,9 @@ arrows on top of the letters.
   |   x  = ux t + (1/2) ax t^2   |   y  = uy t + (1/2) ay t^2   |
   |   vx^2 = ux^2 + 2 ax x       |   vy^2 = uy^2 + 2 ay y       |
   +------------------------------+------------------------------+
+```
 
+```
   *** THE ONE THING SHARED BY BOTH COLUMNS IS THE TIME t. ***
 ```
 

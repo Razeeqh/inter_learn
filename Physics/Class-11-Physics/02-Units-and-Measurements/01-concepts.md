@@ -473,7 +473,9 @@ shift is called the parallax.
                         \ /
                          o  observer on Earth
                          |<------ D ------>|
+```
 
+```
                     d  =  D  x  alpha
 ```
 

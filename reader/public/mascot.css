@@ -1,0 +1,126 @@
+/* The landing page study companion. Scoped to .mascot. */
+
+.mascot {
+  position: fixed; left: clamp(10px, 3vw, 46px); bottom: 0; z-index: 15;
+  width: clamp(150px, 17vw, 250px); pointer-events: none;
+  opacity: 0; transform: translateY(30px);
+  transition: opacity .7s ease, transform .7s cubic-bezier(.2, .8, .3, 1), left .9s ease;
+}
+#landing.ready .mascot { opacity: 1; transform: translateY(0); }
+
+.mascot .mc-svg { display: block; width: 100%; height: auto; }
+
+/* the character shifts across the page as the story moves on */
+.mascot[data-pose="write"] { left: clamp(10px, 6vw, 90px); }
+.mascot[data-pose="smile"] { left: clamp(10px, 4vw, 60px); }
+.mascot[data-pose="proud"] { left: clamp(10px, 7vw, 110px); }
+.mascot[data-pose="think"] { left: clamp(10px, 3vw, 46px); }
+
+/* ------------------------------------------------------------------ parts */
+
+.mascot .mc-skin { fill: #f2cba9; }
+.mascot .mc-neck { fill: #d6a179; }
+.mascot .mc-ear { fill: #eec19e; }
+.mascot .mc-hair-b { fill: url(#mcHair); }
+.mascot .mc-hair-f { fill: #141829; }
+.mascot .mc-strand { fill: #2b3252; opacity: .9; }
+.mascot .mc-shine { fill: #3e4a7a; opacity: .55; }
+.mascot .mc-coat { fill: url(#mcCoat); }
+.mascot .mc-coat-sh { fill: #000; opacity: .2; }
+.mascot .mc-collar { fill: #0d1120; }
+.mascot .mc-lapel { fill: #232c4c; }
+.mascot .mc-trim { stroke: #3c6ddb; stroke-width: 3; fill: none; opacity: .8; }
+.mascot .mc-sleeve { stroke: #1b2440; stroke-width: 30; stroke-linecap: round; fill: none; }
+
+.mascot .mc-socket { fill: #f7f9ff; }
+.mascot .mc-iris { fill: url(#mcEye); filter: url(#mcGlow); }
+.mascot .mc-core { fill: #fff; }
+.mascot .mc-lash { stroke: #0f1322; stroke-width: 5; stroke-linecap: round; fill: none; }
+.mascot .mc-brow { stroke: #12172a; stroke-width: 5.5; stroke-linecap: round; fill: none; }
+.mascot .mc-nose { stroke: #c89773; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+.mascot .mc-mouth { stroke: #a9705b; stroke-width: 3.4; stroke-linecap: round; fill: none; }
+
+.mascot .mc-book-c { fill: #2f6bd8; }
+.mascot .mc-page { fill: #eef3ff; }
+.mascot .mc-rule { stroke: #9fb0d0; stroke-width: 2.4; stroke-linecap: round; }
+.mascot .mc-pen rect { fill: #0f1526; }
+.mascot .mc-cap { fill: #4fa3ff; }
+.mascot .mc-nib { fill: #cdd8ee; }
+
+/* --------------------------------------------------------------- switches */
+
+.mascot .mc-eyes-open, .mascot .mc-eyes-shut, .mascot .mc-eyes-up { display: none; }
+.mascot[data-eyes="open"] .mc-eyes-open,
+.mascot[data-eyes="shut"] .mc-eyes-shut,
+.mascot[data-eyes="up"] .mc-eyes-up { display: block; }
+.mascot .mc-eyes-shut path { stroke: #12172a; stroke-width: 5; stroke-linecap: round; fill: none; }
+
+.mascot .mc-mouth { display: none; }
+.mascot[data-mouth="soft"] .m-soft,
+.mascot[data-mouth="wide"] .m-wide,
+.mascot[data-mouth="small"] .m-small { display: block; }
+
+/* brows lift when the eyes close */
+.mascot[data-eyes="shut"] .mc-brow.l { transform: translateY(-4px); }
+.mascot[data-eyes="shut"] .mc-brow.r { transform: translateY(-4px); }
+
+/* ------------------------------------------------------------- animation */
+
+.mascot .mc-all { animation: mcBreathe 4.4s ease-in-out infinite; transform-origin: 130px 330px; }
+.mascot .mc-head { animation: mcNod 6s ease-in-out infinite; transform-origin: 130px 190px; }
+.mascot .mc-eyes-open { animation: mcBlink 5.5s ease-in-out infinite; transform-origin: 130px 124px; }
+.mascot .mc-hand { transform: translate(214px, 296px); }
+.mascot .mc-pen { transform-origin: 0 0; }
+
+.mascot[data-pose="read"] .mc-armR { animation: mcPoint 5s ease-in-out infinite; transform-origin: 188px 250px; }
+.mascot[data-pose="write"] .mc-armR { animation: mcWrite 1.6s ease-in-out infinite; transform-origin: 188px 250px; }
+.mascot[data-pose="write"] .mc-pen { transform: rotate(38deg); }
+.mascot[data-pose="smile"] .mc-armR { animation: mcWave 2.4s ease-in-out infinite; transform-origin: 188px 250px; }
+.mascot[data-pose="think"] .mc-pen { animation: mcTwirl 2.2s cubic-bezier(.5, 0, .5, 1) infinite; }
+.mascot[data-pose="think"] .mc-head { animation: mcPonder 4s ease-in-out infinite; }
+.mascot[data-pose="proud"] .mc-book { animation: mcLift 3s ease-in-out infinite; }
+
+@keyframes mcBreathe { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.015); } }
+@keyframes mcNod { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(2deg) translateY(2px); } }
+@keyframes mcBlink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
+@keyframes mcPoint { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-5deg); } }
+@keyframes mcWrite { 0%, 100% { transform: rotate(0deg) translateY(0); } 50% { transform: rotate(-4deg) translateY(3px); } }
+@keyframes mcWave { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(-17deg); } }
+@keyframes mcTwirl { 0%, 30% { transform: rotate(0deg); } 72%, 100% { transform: rotate(360deg); } }
+@keyframes mcPonder { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(-9deg) translateY(-2px); } }
+@keyframes mcLift { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+
+/* ---------------------------------------------------------------- bubble */
+
+.mascot .mc-bubble {
+  position: absolute; left: 62%; bottom: 74%; width: max-content; max-width: 260px;
+  padding: 14px 18px; border-radius: 16px 16px 16px 4px;
+  background: #fff; color: #1d2540;
+  font-family: var(--sans); font-size: 14px; line-height: 1.45; font-weight: 550;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .32);
+  opacity: 0; transform: translateY(8px) scale(.94); transform-origin: 0 100%;
+}
+.mascot .mc-bubble p { margin: 0; }
+.mascot .mc-bubble::after {
+  content: ''; position: absolute; left: 12px; bottom: -9px;
+  border: 10px solid transparent; border-top-color: #fff; border-bottom: 0;
+}
+.mascot.say .mc-bubble { animation: mcSay .5s cubic-bezier(.2, .9, .3, 1.4) forwards; }
+
+@keyframes mcSay {
+  0% { opacity: 0; transform: translateY(8px) scale(.94); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 900px) {
+  .mascot { width: 118px; left: 8px; }
+  .mascot .mc-bubble { font-size: 12.5px; max-width: 180px; padding: 10px 13px; }
+}
+@media (max-width: 620px) {
+  .mascot { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mascot *, .mascot { animation: none !important; }
+  .mascot .mc-bubble { opacity: 1; transform: none; }
+}

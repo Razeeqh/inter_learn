@@ -80,17 +80,27 @@ for (const file of files) {
       } else {
         // stray box drawing that should have been consumed by the parser
         // (a bare | is not counted: |x| is an absolute value)
-        const text = html.replace(/<[^>]+>/g, ' ');
+        // a block may mix diagrams and cards; borders inside a <pre> are meant
+        // to be there, so only the card part is checked
+        const cards = html.replace(/<pre[\s\S]*?<\/pre>/g, ' ');
+        const text = cards.replace(/<[^>]+>/g, ' ');
         if (/\+--|--\+/.test(text)) {
-          issues.boxLeak.hits.push({ rel, line: start, code });
+          issues.boxLeak.hits.push({
+            rel, line: start,
+            code: 'OUT: ' + text.replace(/\s+/g, ' ').trim().slice(0, 200) + '\n' + code
+          });
         }
         // a panel whose frame the parser could not strip. Matrices also use
-        // +---+ and bars, but the parser turns those into real brackets.
+        // +---+ and bars, but the parser turns those into real brackets. A
+        // surviving frame shows up as a cell wrapped in bars end to end; bars
+        // that pair up inside a cell are absolute values.
         const framed = buf.filter((l) => /^\s*\|.*\|\s*$/.test(l)).length >= 3 &&
           buf.some((l) => /^\s*\+[-=]+\+\s*$/.test(l));
+        const wrapped = [...html.matchAll(/<div class="(?:expr|cap)[^"]*">([\s\S]*?)<\/div>/g)]
+          .map((m) => m[1].replace(/<[^>]+>/g, '').trim())
+          .filter((c) => /^\|/.test(c) && /\|$/.test(c) && c.length > 20).length;
         if (framed && !/class="mat"/.test(html) && !/expr wide algn/.test(html) &&
-            !T.unframe(buf.map((l) => l.replace(/\r/g, ''))) &&
-            (text.match(/\|/g) || []).length >= 3) {
+            !T.unframe(buf.map((l) => l.replace(/\r/g, ''))) && wrapped >= 1) {
           issues.frameLeak.hits.push({ rel, line: start, code });
         }
         if (GREEK_WORDS.test(text) || RELATIONS.test(text)) {
