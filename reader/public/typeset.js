@@ -152,6 +152,13 @@ function applyRules(s) {
 const MATHY = new RegExp(
   '[=^]|\\bsqrt|&lt;=|&gt;=|\\bINT\\b|--?&gt;|\\+\\/-|\\b(' + Object.keys(GREEK).join('|') + ')\\b');
 
+/** Spans that really are code, not algebra. */
+const CODEY = /\.(md|ps1|js|py|cmd|json|html|css|txt)\b|\/\/|[{};$]|\b(function|const|let|npm|git|python|node|cd|dir)\b/;
+
+/** A short span of nothing but algebra characters reads better set as maths
+ *  than as monospace code in the middle of a sentence. */
+const ALGEBRAIC = /^[A-Za-z0-9+\-*/^_().,'!\s]+$/;
+
 const unesc = (s) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 
 /** Set an expression with KaTeX when it can be read as LaTeX, otherwise fall
@@ -176,7 +183,9 @@ function typesetInline(raw) {
   // anything that looks like an expression is typeset rather than left as code.
   const held = [];
   s = s.replace(/`([^`]+)`/g, (_, code) => {
-    const isMath = MATHY.test(code) && !/\.(md|ps1|js|py|cmd)\b/.test(code);
+    const plain = unesc(code);
+    const isMath = !CODEY.test(plain) &&
+      (MATHY.test(code) || (plain.length <= 40 && ALGEBRAIC.test(plain) && /[A-Za-z0-9]/.test(plain)));
     held.push(isMath
       ? '<span class="imath">' + math(unesc(code)) + '</span>'
       : '<code>' + code + '</code>');
@@ -406,6 +415,7 @@ function isArt(lines) {
     if (/[^-+\s][^+]*-{2,}\+\s*$/.test(l)) return true;   // a drawn corner after text
     if (/-{2,}\+-{2,}/.test(l)) return true;       // a drawn junction
     if (/\+-{4,}[^+]*$/.test(l)) return true;      // a long rule that never closes
+    if (/-{2,}>\s*\|/.test(l) || /\|\s*-{2,}>/.test(l)) return true;   // an arrow into a box
     if (/\+-{2,}>/.test(l)) return true;           // a drawn axis with an arrow head
     if (/\+-{2,}/.test(l) && />\s*[A-Za-z]?\s*$/.test(l)) return true;   // axis with points on it
     if (/\*{2,}/.test(l)) return true;             // a plotted curve
@@ -618,6 +628,16 @@ function prettyTree(lines) {
       c = e - 1;
     }
   }
+
+  // where a rail runs out into the next label, point at it
+  for (let r = 0; r < g.length; r++) {
+    for (let c = 0; c < g[r].length; c++) {
+      if (g[r][c] !== '\u2502') continue;
+      const below = at(r + 1, c);
+      if (BOX.includes(below) || below === '+') continue;
+      if ((g[r + 1] || []).join('').trim()) g[r][c] = '\u25bc';
+    }
+  }
   return g.map((r) => r.join(''));
 }
 
@@ -692,38 +712,23 @@ function artBlock(lines) {
          lines.map((l) => artInline(esc(l))).join('\n') + '</pre>';
 }
 
+/** Sentences that happened to be fenced: set them as prose, not as code. */
+function proseBlock(lines) {
+  const paras = [];
+  let cur = [];
+  for (const l of lines) {
+    if (l.trim()) cur.push(l.trim());
+    else if (cur.length) { paras.push(cur.join(' ')); cur = []; }
+  }
+  if (cur.length) paras.push(cur.join(' '));
+  if (!paras.length) return '';
+  return '<div class="proseblock">' +
+    paras.map((p) => '<p>' + typesetInline(p) + '</p>').join('') + '</div>';
+}
+
 /** Is this single line part of a drawing? Same tests as isArt, one line at a time. */
 function isDrawnLine(l) {
   return isArt([l]) && l.trim() !== '';
-}
-
-/** Split a block into runs of drawing and runs of text, so one diagram inside an
- *  explanation does not force the whole explanation into monospace. */
-function segments(lines) {
-  const drawn = lines.map(isDrawnLine);
-
-  // a blank line belongs to the picture only if it is inside one
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].trim()) continue;
-    drawn[i] = Boolean(drawn[i - 1]) && Boolean(drawn[i + 1]);
-  }
-  // a couple of label lines inside a picture are part of it
-  for (let i = 0; i < lines.length; i++) {
-    if (drawn[i]) continue;
-    let j = i;
-    while (j < lines.length && !drawn[j]) j++;
-    if (j - i <= 2 && i > 0 && j < lines.length) for (let k = i; k < j; k++) drawn[k] = true;
-    i = j - 1;
-  }
-
-  const segs = [];
-  for (let i = 0; i < lines.length;) {
-    let j = i;
-    while (j < lines.length && drawn[j] === drawn[i]) j++;
-    segs.push({ art: drawn[i], lines: lines.slice(i, j) });
-    i = j;
-  }
-  return segs.filter((s) => s.lines.some((l) => l.trim()));
 }
 
 /** Render as a card, unless doing so would print box drawing, in which case the
@@ -759,19 +764,11 @@ function renderBlock(code) {
   const outline = outlineTree(lines);
   if (outline) return outline;
 
-  const segs = segments(lines);
-  if (segs.length > 1) {
-    // mostly picture: the odd label line between the strokes belongs to it
-    const body = lines.filter((l) => l.trim());
-    const drawn = body.filter(isDrawnLine).length;
-    if (drawn / body.length >= 0.4) return artBlock(prettyTree(lines) || lines);
-
-    return segs.map((s) => (s.art
-      ? artBlock(prettyTree(s.lines) || s.lines)
-      : cardOrArt(s.lines))).join('');
-  }
-
-  if (isArt(lines)) return artBlock(prettyTree(lines) || lines);
+  // A fenced block is one picture or one sheet of formulas, never a mixture of
+  // both: splitting it would cut the connecting lines of a diagram.
+  // A panel is a box drawn AROUND formulas, so it still reads as a sheet.
+  if (unframe(lines)) return cardOrArt(lines);
+  if (lines.some(isDrawnLine)) return artBlock(prettyTree(lines) || lines);
   return cardOrArt(lines);
 }
 
@@ -841,10 +838,23 @@ function renderRows(input, raw) {
     const clean = line.replace(/\+[-=]{2,}\+/g, (m) => ' '.repeat(m.length));
 
     // a line with several wide gaps is a column layout (a balanced equation, a
-    // reactants/products table); splitting it in two would lose the alignment
-    if (!clean.includes('=') && (clean.trim().match(/\s{3,}/g) || []).length >= 2) {
-      rows.push({ expr: typesetInline(clean.replace(/\s+$/, '')), aligned: true });
-      i++;
+    // reactants/products table); splitting it in two would lose the alignment.
+    // One such line on its own is just loose spacing, and setting it in
+    // monospace beside typeset rows makes the card look like two documents.
+    const colShape = (l) => {
+      const t = (l || '').replace(/\+[-=]{2,}\+/g, ' ').trim();
+      return Boolean(t) && !t.includes('=') && (t.match(/\s{3,}/g) || []).length >= 2;
+    };
+    if (colShape(line) && (colShape(lines[i - 1]) || colShape(lines[i + 1]))) {
+      // take the whole run in one piece, or the table comes out in slices
+      const grp = [];
+      while (i < lines.length &&
+             (colShape(lines[i]) || /^[\s-]*-{2,}[\s-]*$/.test(lines[i]))) {
+        grp.push(lines[i].replace(/\+[-=]{2,}\+/g, (m) => ' '.repeat(m.length))
+          .replace(/\s+$/, ''));
+        i++;
+      }
+      rows.push({ expr: typesetInline(grp.join('\n')), aligned: true });
       continue;
     }
 
@@ -870,6 +880,9 @@ function renderRows(input, raw) {
     rows.some((r) => !r.gap && !r.divider && /[=\u2264\u2265\u2260\u2192\u27f6\u00b1\u00d7\u222b\u2211\u221a]/.test(r.expr));
   if (!hasMath && !framed) {
     const src = raw.split('\n');
+    // monospace is only worth its cramped look when something is lined up in it
+    const aligned = src.filter((l) => /\S\s{3,}\S/.test(l)).length >= 2;
+    if (!aligned && !src.some(isDrawnLine)) return proseBlock(src);
     return artBlock(prettyTree(src) || src);
   }
 

@@ -329,8 +329,10 @@ a:hover { text-decoration: underline; }
 }
 .fsheet .expr.wide { grid-column: 1 / -1; }
 .fsheet .expr.algn {
-  font-family: var(--code); font-size: .8em; line-height: 1.7;
-  white-space: pre; text-align: left; overflow-x: auto; justify-self: start;
+  font-family: var(--code); font-size: .78em; line-height: 1.65;
+  white-space: pre; text-align: left; overflow-x: auto; justify-self: stretch;
+  background: var(--soft); border: 1px solid var(--line); border-radius: 8px;
+  padding: 10px 14px; margin: .35em 0; color: var(--ink);
 }
 .fsheet .note {
   font-family: var(--sans); font-size: 13.5px; color: var(--dim); line-height: 1.55;
@@ -344,18 +346,32 @@ a:hover { text-decoration: underline; }
 .fsheet .fdiv { grid-column: 1 / -1; height: 1px; background: var(--line); margin: .9em 0 .5em; }
 .fsheet .spacer { grid-column: 1 / -1; height: .55em; }
 
+/* ---------------- fenced sentences ---------------- */
+.proseblock {
+  margin: 1.5em 0; padding: 18px 24px;
+  background: var(--panel); border: 1px solid var(--line);
+  border-left: 4px solid var(--accent-soft); border-radius: 12px;
+}
+.proseblock p {
+  margin: 0 0 .6em; font-family: var(--serif); font-size: 17.5px;
+  line-height: 1.65; color: var(--ink);
+}
+.proseblock p:last-child { margin-bottom: 0; }
+
 /* ---------------- untouched diagrams ---------------- */
 pre.art {
-  margin: 1.4em 0; padding: 16px 18px; overflow-x: auto;
-  background: var(--soft); border: 1px solid var(--line); border-radius: 10px;
-  font-family: var(--code); font-size: var(--mono); line-height: 1.5; color: var(--ink-2);
+  margin: 1.5em 0; padding: 20px 24px; overflow-x: auto;
+  background: var(--panel); border: 1px solid var(--line);
+  border-left: 4px solid var(--accent); border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(10,20,40,.04);
+  font-family: var(--code); font-size: var(--mono); line-height: 1.5; color: var(--ink);
   white-space: pre; -webkit-overflow-scrolling: touch;
 }
 
 /* shrink a diagram just enough to fit the column, rather than making it scroll */
 @supports (container-type: inline-size) {
   .doc { container-type: inline-size; }
-  pre.art { font-size: max(9px, min(var(--mono), calc((100cqw - 40px) / (var(--cols, 60) * 0.605)))); }
+  pre.art { font-size: max(11px, min(var(--mono), calc((100cqw - 52px) / (var(--cols, 60) * 0.605)))); }
 }
 
 /* ---------------- tables ---------------- */

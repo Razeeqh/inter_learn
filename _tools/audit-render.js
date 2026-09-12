@@ -11,8 +11,14 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 global.window = {};
+// the reader converts to LaTeX before it typesets, so the audit must too, or it
+// only ever sees the plain text fallback
+eval(fs.readFileSync(path.join(ROOT, 'reader/public/tex.js'), 'utf8'));
+window.katex = require(path.join(ROOT, 'reader/public/vendor/katex/katex.min.js'));
 eval(fs.readFileSync(path.join(ROOT, 'reader/public/typeset.js'), 'utf8'));
+eval(fs.readFileSync(path.join(ROOT, 'reader/public/md.js'), 'utf8'));
 const T = window.Typeset;
+const renderMd = window.renderMarkdown;
 
 const SUBJECTS = ['Maths', 'Physics', 'Chemistry'];
 const showAll = process.argv.includes('--all');
@@ -26,8 +32,14 @@ const issues = {
   rawCaret: { desc: 'caret or sqrt( survived into prose output', hits: [] },
   rawSymbol: { desc: 'greek name, arrow or relation left as plain text', hits: [] },
   artSymbol: { desc: 'greek name left as a word inside a diagram', hits: [] },
+  proseMath: { desc: 'a sentence set as algebra (italic, mashed words)', hits: [] },
+  mixedFont: { desc: 'monospace and typeset rows inside one card', hits: [] },
   wideArt: { desc: 'diagram wider than 100 columns (will scroll on phones)', hits: [] }
 };
+
+// words no formula uses, so three of them means the line is being read, not
+// solved. Single letters stay out of the list: A and B are sets, not articles.
+const STOP = /\b(the|that|this|with|from|have|has|are|was|were|but|you|your|every|when|then|than|into|onto|over|under|about|which|what|how|there|their|they|them|can|will|must|should|would|use|used|using|make|makes|take|takes|give|gives|get|gets|put|puts|write|read|look|show|shows|find|know|same|both|other|another|first|last|next|before|after|because|let|lets|means|happens|holds|called|says|here|also|just|still|again|does|did|done)\b/gi;
 
 const GREEK_WORDS = /\b(alpha|beta|gamma|delta|epsilon|theta|lambda|mu|nu|pi|rho|sigma|tau|phi|chi|psi|omega|Delta|Sigma|Omega|Phi|Lambda|Theta|Gamma)\b/;
 const RELATIONS = /(^|[^-<>])(->|<-|<=|>=|!=|\+\/-)([^->]|$)/;
@@ -78,12 +90,31 @@ for (const file of files) {
         const drawn = html.replace(/<[^>]+>/g, ' ');
         if (GREEK_WORDS.test(drawn)) issues.artSymbol.hits.push({ rel, line: start, code });
       } else {
+        // a sentence pushed through LaTeX: italic letters with the spaces eaten
+        for (const m of html.matchAll(/<annotation encoding="application\/x-tex">([\s\S]*?)<\/annotation>/g)) {
+          const tex = m[1];
+          const plain = tex.replace(/\\(text|mathrm|mathbf)\{([^{}]*)\}/g, ' $2 ')
+            .replace(/\\[a-zA-Z]+/g, ' ').replace(/[{}\\]/g, ' ');
+          if ((plain.match(STOP) || []).length >= 3) {            issues.proseMath.hits.push({ rel, line: start, code: tex.slice(0, 150) + '\n' + code });
+            break;
+          }
+        }
+        // a single monospace line among typeset ones is a font accident; a
+        // multi-line one is an aligned table, which is meant to look different
+        const algn = [...html.matchAll(/<div class="expr wide algn">([\s\S]*?)<\/div>/g)];
+        const lone = algn.filter((m) => !m[1].includes('\n')).length;
+        if (lone && /class="katex"/.test(html)) {
+          issues.mixedFont.hits.push({ rel, line: start, code });
+        }
         // stray box drawing that should have been consumed by the parser
         // (a bare | is not counted: |x| is an absolute value)
         // a block may mix diagrams and cards; borders inside a <pre> are meant
         // to be there, so only the card part is checked
         const cards = html.replace(/<pre[\s\S]*?<\/pre>/g, ' ');
-        const text = cards.replace(/<[^>]+>/g, ' ');
+        // KaTeX keeps the TeX source and a MathML copy in the markup; neither is
+        // shown to the reader, so neither counts as output
+        const shown = cards.replace(/<span class="katex-mathml">[\s\S]*?<\/span><span class="katex-html"/g, '<span class="katex-html"');
+        const text = shown.replace(/<[^>]+>/g, ' ');
         if (/\+--|--\+/.test(text)) {
           issues.boxLeak.hits.push({
             rel, line: start,
@@ -106,7 +137,7 @@ for (const file of files) {
         if (GREEK_WORDS.test(text) || RELATIONS.test(text)) {
           issues.rawSymbol.hits.push({ rel, line: start, code });
         }
-        const rows = [...html.matchAll(/<div class="expr">(.*?)<\/div><div class="note">(.*?)<\/div>/gs)];
+        const rows = [...shown.matchAll(/<div class="expr">(.*?)<\/div><div class="note">(.*?)<\/div>/gs)];
         for (const r of rows) {
           const expr = r[1].replace(/<[^>]+>/g, '').trim();
           const note = r[2].replace(/<[^>]+>/g, '').trim();
@@ -117,10 +148,13 @@ for (const file of files) {
       continue;
     }
 
-    // prose lines
+    // prose lines, rendered the way the reader renders them
     const l = lines[i];
     if (!l.trim() || /^\s*[|+]/.test(l)) continue;
-    const out = T.inline(l).replace(/<[^>]+>/g, '');
+    const md = renderMd(l).html || renderMd(l);
+    const out = String(md)
+      .replace(/<span class="katex-mathml">[\s\S]*?<\/span><span class="katex-html"/g, '<span class="katex-html"')
+      .replace(/<[^>]+>/g, ' ');
     if (/\^|sqrt\(/.test(out)) {
       issues.rawCaret.hits.push({ rel, line: i + 1, code: l.trim().slice(0, 110) });
     }

@@ -166,16 +166,25 @@ function chemistry(s) {
 const PLAIN = ['not', 'and', 'or', 'if', 'when', 'where', 'for', 'all', 'any',
   'is', 'to', 'of', 'in', 'at', 'on', 'per', 'each', 'only', 'else', 'then'];
 
+// set language the notes spell out, which reads far better as its symbol
+const SETOPS = {
+  union: '\\cup', intersect: '\\cap', intersection: '\\cap',
+  subset: '\\subset', superset: '\\supset', belongs: '\\in',
+  contains: '\\ni', implies: '\\implies', therefore: '\\therefore'
+};
+
 function words(s) {
   return s.replace(/\b([A-Za-z]+)\b/g, (w) => {
     if (Object.prototype.hasOwnProperty.call(GREEK_TEX, w)) return hold('\\' + GREEK_TEX[w]);
     if (Object.prototype.hasOwnProperty.call(FUNCS, w)) return hold('\\' + FUNCS[w]);
+    if (Object.prototype.hasOwnProperty.call(SETOPS, w)) return hold(' ' + SETOPS[w] + ' ');
     if (w === 'INT') return hold('\\int');
     if (w === 'SUM') return hold('\\sum');
     if (w === 'infinity' || w === 'inf') return hold('\\infty');
     if (/^d[xytrsuv]$/.test(w)) return hold('\\,\\mathrm{d}' + w[1]);   // a differential
     if (PLAIN.includes(w)) return hold('\\text{ ' + w + ' }');
-    if (w.length > 1 && /[A-Z]/.test(w)) return hold('\\mathrm{' + w + '}');   // a name
+    // a name: set upright and keep its spaces, or "STEP 2" comes out as "STEP2"
+    if (w.length > 1 && /[A-Z]/.test(w)) return hold('\\text{ ' + w + ' }');
     // four letters or more is an English word, not a product like 4ac
     if (w.length >= 4) return hold('\\text{ ' + w + ' }');
     return w;
@@ -248,6 +257,10 @@ function expr(src, fail) {
 
 /* Reasons an expression is not attempted. Kept as a list so the audit can
  * report which one fired. */
+
+/** Joining words no formula needs. Single letters stay out: A and B are sets. */
+const CONNECTIVE = /\b(the|that|this|with|from|have|has|are|was|were|but|you|your|every|when|then|than|into|onto|over|under|about|which|what|how|there|their|they|them|can|will|must|should|would|use|used|using|make|makes|take|takes|give|gives|get|gets|put|puts|write|read|look|show|shows|find|know|same|both|other|another|first|last|next|before|after|because|let|lets|means|happens|holds|called|says|here|also|just|still|again|does|did|done|since|we|our|forget|forgetting|remember|always|never|usually|often|careful|watch|avoid|instead|rather|locate|step|note|answer|question|mark|marks)\b/gi;
+
 const GUARDS = [
   ['empty', (t) => !t],
   ['tooLong', (t) => t.length > 220],
@@ -263,7 +276,13 @@ const GUARDS = [
   ['matrixRow', (t) => /\|/.test(t) && /\s{2,}/.test(t)],
   ['sentence', (t) => /[a-z]{3,}\s+[a-z]{3,}\s+[a-z]{3,}/.test(t)],
   // a run of capitalised words with nothing to solve is a heading, not algebra
-  ['heading', (t) => !/[=<>]/.test(t) && (t.match(/\b[A-Z]{3,}\b/g) || []).length >= 3],
+  ['heading', (t) => !/[=<>]/.test(t.replace(/[-<]+>|<[-=]+/g, ' ')) &&
+    (t.match(/\b[A-Z]{3,}\b/g) || []).length >= 3],
+  // a shouty label sitting in a sentence means the line is being read, not solved
+  ['shouty', (t) => /\b[A-Z]{3,}\b/.test(t) && /\b[a-z]{2,}\b/.test(
+    t.replace(/\b(sin|cos|tan|cot|sec|cosec|log|ln|exp|lim|max|min|sqrt|abs|in|for)\b/g, ' '))],
+  // two joining words and it is a sentence carrying a formula, not a formula
+  ['connectives', (t) => (t.match(CONNECTIVE) || []).length >= 2],
   // mostly English: better set as prose than as a product of italic letters
   ['wordy', (t) => (t.match(/\b[a-z]{2,}\b/g) || [])
     .filter((w) => !FUNCS[w] && !GREEK_TEX[w] && !/^d[xytrsuv]$/.test(w)).length >= 4]
