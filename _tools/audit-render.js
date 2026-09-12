@@ -102,9 +102,12 @@ for (const file of files) {
         // a single monospace line among typeset ones is a font accident; a
         // multi-line one is an aligned table, which is meant to look different
         const algn = [...html.matchAll(/<div class="expr wide algn">([\s\S]*?)<\/div>/g)];
-        const lone = algn.filter((m) => !m[1].includes('\n')).length;
-        if (lone && /class="katex"/.test(html)) {
-          issues.mixedFont.hits.push({ rel, line: start, code });
+        const lone = algn.filter((m) => !m[1].includes('\n'));
+        if (lone.length && /class="katex"/.test(html)) {
+          issues.mixedFont.hits.push({
+            rel, line: start,
+            code: 'ROW: ' + lone.map((m) => m[1].replace(/<[^>]+>/g, '')).join(' / ') + '\n' + code
+          });
         }
         // stray box drawing that should have been consumed by the parser
         // (a bare | is not counted: |x| is an absolute value)

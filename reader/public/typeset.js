@@ -341,6 +341,12 @@ function fractionAt(lines, i) {
     runs.push([m.index, e]);
   }
   if (!runs.length) return null;
+  // Several rules side by side with nothing joining them is the rule under a
+  // table header, not a row of fractions.
+  if (runs.length > 1) {
+    const joined = runs.slice(1).some((r, k) => cur.slice(runs[k][1], r[0]).trim());
+    if (!joined) return null;
+  }
 
   const seg = (l, s, e) => pad(l || '', e).slice(s, e).trim();
   const first = runs[0][0];
@@ -821,6 +827,25 @@ function renderRows(input, raw) {
       continue;
     }
 
+    // A line with several wide gaps is a column layout (a balanced equation, a
+    // table of values). Claim the whole run before the rule branch below takes
+    // only the first three lines of it.
+    const colShape = (l) => {
+      const t = (l || '').replace(/\+[-=]{2,}\+/g, ' ').trim();
+      return Boolean(t) && !t.includes('=') && (t.match(/\s{3,}/g) || []).length >= 2;
+    };
+    if (colShape(line) && (colShape(lines[i - 1]) || colShape(lines[i + 1]))) {
+      const grp = [];
+      while (i < lines.length &&
+             (colShape(lines[i]) || /^[\s-]*-{2,}[\s-]*$/.test(lines[i]))) {
+        grp.push(lines[i].replace(/\+[-=]{2,}\+/g, (m) => ' '.repeat(m.length))
+          .replace(/\s+$/, ''));
+        i++;
+      }
+      rows.push({ expr: typesetInline(grp.join('\n')), aligned: true });
+      continue;
+    }
+
     // a bar we could not read as a fraction: keep the three lines as they were
     // drawn rather than printing the bar as a row of dashes
     if (/^[\s\-,()]*-{3,}[\s\-,()]*$/.test(lines[i + 1] || '')) {
@@ -837,27 +862,6 @@ function renderRows(input, raw) {
     // a +---+ run still on a line of text is decoration the parser could not
     // use; blank it rather than print it, keeping the columns the rest relies on
     const clean = line.replace(/\+[-=]{2,}\+/g, (m) => ' '.repeat(m.length));
-
-    // a line with several wide gaps is a column layout (a balanced equation, a
-    // reactants/products table); splitting it in two would lose the alignment.
-    // One such line on its own is just loose spacing, and setting it in
-    // monospace beside typeset rows makes the card look like two documents.
-    const colShape = (l) => {
-      const t = (l || '').replace(/\+[-=]{2,}\+/g, ' ').trim();
-      return Boolean(t) && !t.includes('=') && (t.match(/\s{3,}/g) || []).length >= 2;
-    };
-    if (colShape(line) && (colShape(lines[i - 1]) || colShape(lines[i + 1]))) {
-      // take the whole run in one piece, or the table comes out in slices
-      const grp = [];
-      while (i < lines.length &&
-             (colShape(lines[i]) || /^[\s-]*-{2,}[\s-]*$/.test(lines[i]))) {
-        grp.push(lines[i].replace(/\+[-=]{2,}\+/g, (m) => ' '.repeat(m.length))
-          .replace(/\s+$/, ''));
-        i++;
-      }
-      rows.push({ expr: typesetInline(grp.join('\n')), aligned: true });
-      continue;
-    }
 
     const { expr, note } = splitRow(clean);
     // a heading is all capitals with real words in it, and carries no note of its
