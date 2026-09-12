@@ -419,6 +419,8 @@ function isArt(lines) {
 /** A +---+---+ grid table becomes a real table rather than monospace.
  *  Cells are cut at the column positions given by the rule line, so a stray bar
  *  inside a cell (an absolute value) does not shift every column along. */
+const AS_ART = { art: true };
+
 function asciiTable(lines) {
   const all = lines.filter((l) => l.trim() !== '');
   const edge = (l) => /^\s*\+[-+]+\+\s*$/.test(l) && (l.match(/\+/g) || []).length > 2;
@@ -468,7 +470,7 @@ function asciiTable(lines) {
   if (!groups.length) return null;
   // cells holding wires, hatching or rules are a drawing laid out in a grid
   if (groups.some((g) => g.some((r) => r.some((c) => /-{2,}|~{2,}|\|{2,}|_{2,}/.test(c))))) {
-    return null;
+    return AS_ART;
   }
 
   const cell = (c, tag) => '<' + tag + '>' + math(c) + '</' + tag + '>';
@@ -751,6 +753,7 @@ function renderBlock(code) {
   const lines = raw.split('\n');
 
   const table = asciiTable(lines);
+  if (table === AS_ART) return artBlock(lines);
   if (table) return table;
 
   const outline = outlineTree(lines);

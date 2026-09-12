@@ -262,6 +262,8 @@ const GUARDS = [
   // bars plus column spacing means a matrix row; LaTeX would eat the gaps
   ['matrixRow', (t) => /\|/.test(t) && /\s{2,}/.test(t)],
   ['sentence', (t) => /[a-z]{3,}\s+[a-z]{3,}\s+[a-z]{3,}/.test(t)],
+  // a run of capitalised words with nothing to solve is a heading, not algebra
+  ['heading', (t) => !/[=<>]/.test(t) && (t.match(/\b[A-Z]{3,}\b/g) || []).length >= 3],
   // mostly English: better set as prose than as a product of italic letters
   ['wordy', (t) => (t.match(/\b[a-z]{2,}\b/g) || [])
     .filter((w) => !FUNCS[w] && !GREEK_TEX[w] && !/^d[xytrsuv]$/.test(w)).length >= 4]
