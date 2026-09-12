@@ -85,7 +85,7 @@ for (const file of files) {
         if (body.length && eq / body.length > 0.6 && !/[\\]/.test(code)) {
           issues.missedMath.hits.push({ rel, line: start, code });
         }
-        const widest = Math.max(...buf.map((l) => l.length));
+        const widest = Number((html.match(/--cols:(\d+)/) || [])[1] || 0);
         if (widest > 100) issues.wideArt.hits.push({ rel, line: start, code: `${widest} columns` });
         const drawn = html.replace(/<[^>]+>/g, ' ');
         if (GREEK_WORDS.test(drawn)) issues.artSymbol.hits.push({ rel, line: start, code });

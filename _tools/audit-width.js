@@ -18,6 +18,7 @@ function walk(dir, out = []) {
 }
 
 const widths = [];
+const trimmed = [];
 for (const file of ['Maths', 'Physics', 'Chemistry'].flatMap((s) => walk(path.join(ROOT, s)))) {
   const lines = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n').split('\n');
   for (let i = 0; i < lines.length; i++) {
@@ -27,15 +28,21 @@ for (const file of ['Maths', 'Physics', 'Chemistry'].flatMap((s) => walk(path.jo
     while (i < lines.length && !/^\s*```/.test(lines[i])) buf.push(lines[i++]);
     if (!buf.join('').trim()) continue;
     if (!T.block(buf.join('\n')).startsWith('<div class="artwrap"')) continue;
-    widths.push(Math.max(...buf.map((l) => l.length)));
+    const raw = buf.map((l) => l.replace(/\s+$/, ''));
+    widths.push(Math.max(...raw.map((l) => l.length)));
+    const body = raw.filter((l) => l.trim());
+    const indent = Math.min(...body.map((l) => l.match(/^ */)[0].length));
+    trimmed.push(Math.max(...raw.map((l) => Math.max(0, l.length - indent))));
   }
 }
 
 widths.sort((a, b) => a - b);
-const at = (p) => widths[Math.floor(widths.length * p)];
+trimmed.sort((a, b) => a - b);
+const at = (a, p) => a[Math.floor(a.length * p)];
 console.log('diagrams', widths.length);
-console.log('median', at(0.5), ' 75th', at(0.75), ' 90th', at(0.9), ' 99th', at(0.99), ' max', widths[widths.length - 1]);
-for (const w of [50, 60, 70, 80, 90, 100]) {
-  const n = widths.filter((x) => x > w).length;
-  console.log(`wider than ${w} cols: ${n}  (${(100 * n / widths.length).toFixed(0)}%)`);
+console.log('as drawn      median', at(widths, 0.5), ' 90th', at(widths, 0.9), ' max', widths[widths.length - 1]);
+console.log('after dedent  median', at(trimmed, 0.5), ' 90th', at(trimmed, 0.9), ' max', trimmed[trimmed.length - 1]);
+for (const w of [50, 60, 70, 80, 100]) {
+  console.log(`wider than ${w}:  as drawn ${widths.filter((x) => x > w).length}` +
+    `   dedented ${trimmed.filter((x) => x > w).length}`);
 }

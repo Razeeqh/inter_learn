@@ -715,9 +715,16 @@ function outlineTree(lines) {
 /** A monospace diagram, tagged with its width so it can be scaled to fit. The
  *  wrapper gives the scroll hint somewhere to sit that does not scroll away. */
 function artBlock(lines) {
-  const cols = lines.reduce((n, l) => Math.max(n, l.length), 0);
+  // the shared left margin and any trailing spaces only make the drawing look
+  // wider than it is, which shrinks the type needed to fit it on screen
+  const rows = lines.map((l) => l.replace(/\s+$/, ''));
+  const body = rows.filter((l) => l.trim());
+  const indent = body.length
+    ? Math.min.apply(null, body.map((l) => l.match(/^ */)[0].length)) : 0;
+  const out = indent ? rows.map((l) => l.slice(indent)) : rows;
+  const cols = out.reduce((n, l) => Math.max(n, l.length), 0);
   return '<div class="artwrap"><pre class="art" style="--cols:' + Math.max(cols, 20) + '">' +
-         lines.map((l) => artInline(esc(l))).join('\n') + '</pre></div>';
+         out.map((l) => artInline(esc(l))).join('\n') + '</pre></div>';
 }
 
 /** Sentences that happened to be fenced: set them as prose, not as code. */
