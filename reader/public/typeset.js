@@ -712,11 +712,12 @@ function outlineTree(lines) {
   return '<div class="outline' + (hasVal ? '' : ' solo') + '">' + html + '</div>';
 }
 
-/** A monospace diagram, tagged with its width so it can be scaled to fit. */
+/** A monospace diagram, tagged with its width so it can be scaled to fit. The
+ *  wrapper gives the scroll hint somewhere to sit that does not scroll away. */
 function artBlock(lines) {
   const cols = lines.reduce((n, l) => Math.max(n, l.length), 0);
-  return '<pre class="art" style="--cols:' + Math.max(cols, 20) + '">' +
-         lines.map((l) => artInline(esc(l))).join('\n') + '</pre>';
+  return '<div class="artwrap"><pre class="art" style="--cols:' + Math.max(cols, 20) + '">' +
+         lines.map((l) => artInline(esc(l))).join('\n') + '</pre></div>';
 }
 
 /** Sentences that happened to be fenced: set them as prose, not as code. */

@@ -359,6 +359,23 @@ a:hover { text-decoration: underline; }
 .proseblock p:last-child { margin-bottom: 0; }
 
 /* ---------------- untouched diagrams ---------------- */
+.artwrap { position: relative; }
+
+/* a diagram too wide for the screen scrolls inside its own box, so it says so */
+.artwrap.over::after {
+  content: ''; position: absolute; top: 1px; right: 1px; bottom: 1px; width: 44px;
+  border-radius: 0 12px 12px 0; pointer-events: none;
+  background: linear-gradient(to right, transparent, var(--panel) 75%);
+}
+.artwrap.over > .hint {
+  position: absolute; right: 10px; bottom: 8px; z-index: 1;
+  font-family: var(--sans); font-size: 11px; font-weight: 600; letter-spacing: .04em;
+  color: var(--dim); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px;
+  pointer-events: none;
+}
+.artwrap.end::after, .artwrap.end > .hint { opacity: 0; transition: opacity .2s; }
+
 pre.art {
   margin: 1.5em 0; padding: 20px 24px; overflow-x: auto;
   background: var(--panel); border: 1px solid var(--line);

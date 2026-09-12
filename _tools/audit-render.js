@@ -76,7 +76,7 @@ for (const file of files) {
       blocks++;
 
       const html = T.block(code);
-      const isArt = html.startsWith('<pre');
+      const isArt = html.startsWith('<div class="artwrap"');
       if (isArt) art++; else typeset++;
 
       if (isArt) {
