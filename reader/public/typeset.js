@@ -152,12 +152,13 @@ function applyRules(s) {
 const MATHY = new RegExp(
   '[=^]|\\bsqrt|&lt;=|&gt;=|\\bINT\\b|--?&gt;|\\+\\/-|\\b(' + Object.keys(GREEK).join('|') + ')\\b');
 
-/** Spans that really are code, not algebra. */
-const CODEY = /\.(md|ps1|js|py|cmd|json|html|css|txt)\b|\/\/|[{};$]|\b(function|const|let|npm|git|python|node|cd|dir)\b/;
+/** Spans that really are code, not algebra. "const" is left out on purpose: in
+ *  these notes it means constant. */
+const CODEY = /\.(md|ps1|js|py|cmd|json|html|css|txt)\b|\/\/|[{}$]|\b(npm|git|python|node)\b/;
 
 /** A short span of nothing but algebra characters reads better set as maths
  *  than as monospace code in the middle of a sentence. */
-const ALGEBRAIC = /^[A-Za-z0-9+\-*/^_().,'!\s]+$/;
+const ALGEBRAIC = /^[A-Za-z0-9+\-*/^_().,';![\]\s]+$/;
 
 const unesc = (s) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 

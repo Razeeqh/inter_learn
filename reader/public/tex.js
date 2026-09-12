@@ -297,7 +297,12 @@ function toTeX(src, loose) {
 
   HELD = [];
   const fail = { hit: false };
-  const out = splitRelations(text)
+  // "[ 1 1 ; 0 1 ]" is how the notes write a small matrix inline
+  const body = text.replace(/\[([^\[\]]*;[^\[\]]*)\]/g, (m, inner) => {
+    const rows = inner.split(';').map((r) => r.trim().split(/\s+/).join(' & '));
+    return hold('\\begin{bmatrix}' + rows.join(' \\\\ ') + '\\end{bmatrix}');
+  });
+  const out = splitRelations(body)
     .map((p) => (p.rel ? hold(p.rel) : expr(p.text, fail)))
     .join(' ');
   if (fail.hit) return null;
