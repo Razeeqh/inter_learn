@@ -334,6 +334,8 @@ a:hover { text-decoration: underline; }
   background: var(--soft); border: 1px solid var(--line); border-radius: 8px;
   padding: 10px 14px; margin: .35em 0; color: var(--ink);
 }
+.fsheet .expr.li { padding-left: 1.35em; text-indent: -1.35em; }
+.fsheet .bul { color: var(--accent); margin-right: .55em; }
 .fsheet .note {
   font-family: var(--sans); font-size: 13.5px; color: var(--dim); line-height: 1.55;
 }

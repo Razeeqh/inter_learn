@@ -235,6 +235,12 @@ function expr(src, fail) {
   s = s.replace(/([A-Za-z0-9)\]])'\^(\w+)/g, (_, b, e) => b + hold('^{\\prime ' + e + '}'));
   s = s.replace(/([A-Za-z0-9)\]])'/g, (_, b) => b + hold('^{\\prime}'));   // transpose
   s = s.replace(/\{/g, () => hold('\\{')).replace(/\}/g, () => hold('\\}'));   // a set
+  // relations inside a bracket never reached splitRelations, which works at the
+  // top level only, so "{ x : f(x) >= 0 }" would keep its ASCII
+  for (const [from, tex] of RELATIONS) {
+    if (from.length < 2) continue;
+    s = s.split(from).join(' ' + hold(tex) + ' ');
+  }
   for (const [from, tex] of INFIX) s = s.split(from).join(' ' + hold(tex) + ' ');
 
   s = chemistry(s);
@@ -292,7 +298,8 @@ const GUARDS = [
 /** Convert one expression. Returns null when the text is prose or unparseable.
  *  `loose` accepts a bare fragment such as a numerator, which has no operator. */
 function toTeX(src, loose) {
-  const text = String(src).trim();
+  // the notes write these two several ways; fold them onto the forms below
+  const text = String(src).trim().replace(/=\/=/g, '!=').replace(/\+-(?![-\w])/g, '+/-');
   for (const [, test] of GUARDS) if (test(text)) return null;
   if (!loose && !/[=+\-*/^_<>]|\bsqrt\b|\bINT\b|\bSUM\b/.test(text)) return null;
 

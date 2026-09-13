@@ -20,7 +20,12 @@ const CASES = [
   ['x must be 3', { hasNot: '\u00d7' }],
   ['`T P^gamma = const`', { has: '\u03b3', hasNot: '^' }],
   ['`A = [ 1  1 ; 0  1 ]`', { hasNot: ';' }],
-  ['`Start-Reader.cmd`', { has: '.cmd' }]
+  ['`Start-Reader.cmd`', { has: '.cmd' }],
+  ['domain {x : f(x) >= 0}', { has: '\u2265', hasNot: '>=' }],
+  ['s = - b +- sqrt( b^2 - 4 a c )', { has: '\u221a', hasNot: 'sqrt' }],
+  ['true for all n in N (r =/= 1)', { has: '\u2260', hasNot: '=/=' }],
+  ['P_before = P_after', { hasNot: '_' }],
+  ['the interval ( -inf , -5 ]', { has: '\u221e', hasNot: 'inf' }]
 ];
 
 let bad = 0;

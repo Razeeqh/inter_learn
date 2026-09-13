@@ -28,10 +28,12 @@ const OPS = [
   [/&lt;--&gt;/g, '⟷'], [/&lt;=&gt;/g, '⇔'], [/&lt;-&gt;/g, '↔'],
   [/--&gt;/g, '⟶'], [/-&gt;/g, '→'], [/&lt;--/g, '⟵'], [/&lt;-/g, '←'],
   [/=&gt;/g, '⇒'], [/&lt;=/g, '≤'], [/&gt;=/g, '≥'],
-  [/!=/g, '≠'], [/~=/g, '≈'], [/\+\/-/g, '±'],
+  [/=\/=/g, '≠'], [/!=/g, '≠'], [/~=/g, '≈'],
+  [/\+\/-/g, '±'], [/\+-(?![-\w])/g, '±'],
   [/\.\.\./g, '…'],
+  [/(\S)\s\*\s(?=\S)/g, '$1 · '],
   [/\bINT\b/g, '∫'], [/\bSUM\b/g, '∑'],
-  [/\binfinity\b/g, '∞'],
+  [/\binf(inity)?\b/g, '∞'],
   [/\bangstrom\b/g, 'Å'],
   [/(\d)\s*degrees\b/g, '$1°'],
   [/(\d)\s*deg\b/g, '$1°']
@@ -137,6 +139,14 @@ function applyRules(s) {
   // sqrt2, sqrt n: written without brackets
   s = s.replace(/\bsqrt\s*([A-Za-z0-9]+)\b/g,
     (_, inner) => '<span class="sqrt">\u221a<span class="rad">' + inner + '</span></span>');
+
+  // written subscripts: x_1, I_B, P_{before}
+  s = s.replace(/([A-Za-z0-9\)\]])_(\{[^{}]{1,20}\}|[A-Za-z0-9]{1,12})/g,
+    (_, base, sub) => base + '<sub>' + sub.replace(/^\{|\}$/g, '') + '</sub>');
+
+  // written subscripts: x_1, I_B, P_{before}
+  s = s.replace(/([A-Za-z0-9\)\]])_(\{[^{}]{1,20}\}|[A-Za-z0-9]{1,12})/g,
+    (_, base, sub) => base + '<sub>' + sub.replace(/^\{|\}$/g, '') + '</sub>');
 
   s = supBrackets(s);
   // a base may already carry markup, as in d<sub>1</sub>^k, or be a bar or a prime.
@@ -359,16 +369,43 @@ function fractionAt(lines, i) {
   const seg = (l, s, e) => pad(l || '', e).slice(s, e).trim();
   const first = runs[0][0];
   if (next.slice(0, first).trim()) return null;            // denominator must start under the bar
-  const label = prev.slice(0, first).trim();               // e.g. a list marker beside the numerator
-  if (label.length > 6) return null;
   // a bracket left open means the formula is spread over more lines than these
   const open = (l) => (l.match(/\(/g) || []).length - (l.match(/\)/g) || []).length;
   if (open(prev) !== 0 || open(next) !== 0) return null;
 
+  // A numerator is often drawn a little wider than its bar. Take it out to the
+  // token boundary on both sides, or it comes out cut in half.
+  const spans = runs.map(([s, e], k) => {
+    const low = k > 0 ? runs[k - 1][1] : 0;
+    const high = k + 1 < runs.length ? runs[k + 1][0] : prev.length;
+    let from = s;
+    let stop = e;
+    while (from > low && /\S/.test(prev.charAt(from - 1))) from--;
+    while (stop < high && /\S/.test(prev.charAt(stop))) stop++;
+    while (stop < high && open(seg(prev, from, stop)) > 0) stop++;
+    return [from, stop];
+  });
+
+  const dspans = runs.map(([s, e], k) => {
+    const low = k > 0 ? runs[k - 1][1] : 0;
+    const high = k + 1 < runs.length ? runs[k + 1][0] : next.length;
+    let from = s;
+    let stop = e;
+    while (from > low && /\S/.test(next.charAt(from - 1))) from--;
+    while (stop < high && /\S/.test(next.charAt(stop))) stop++;
+    while (stop < high && open(seg(next, from, stop)) > 0) stop++;
+    return [from, stop];
+  });
+
+  const label = prev.slice(0, spans[0][0]).trim();         // a list marker beside the numerator
+  if (label.length > 6) return null;
+
   const parts = [];
-  for (const [s, e] of runs) {
-    const num = seg(prev, s, e);
-    const den = seg(next, s, e);
+  const tailEnd = Math.max(runs[runs.length - 1][1],
+    spans[spans.length - 1][1], dspans[dspans.length - 1][1]);
+  for (let k = 0; k < runs.length; k++) {
+    const num = seg(prev, spans[k][0], spans[k][1]);
+    const den = seg(next, dspans[k][0], dspans[k][1]);
     if (!num || !den) return null;
     parts.push(frac(num, den));
   }
@@ -385,12 +422,10 @@ function fractionAt(lines, i) {
   }
 
   const lead = [label, cur.slice(0, first).trim()].filter(Boolean).join(' ');
-  const last = runs[runs.length - 1][1];
   return {
     html: runs.length === 1
-      ? fracRow(lead, seg(prev, runs[0][0], runs[0][1]), seg(next, runs[0][0], runs[0][1]))
-      : (lead ? typesetInline(lead) + ' ' : '') + html,
-    rhs: [cur.slice(last), prev.slice(last), next.slice(last)]
+      ? fracRow(lead, seg(prev, spans[0][0], spans[0][1]), seg(next, dspans[0][0], dspans[0][1]))
+      : (lead ? typesetInline(lead) + ' ' : '') + html,    rhs: [cur.slice(tailEnd), prev.slice(tailEnd), next.slice(tailEnd)]
       .map(dropFrames).filter(Boolean).join('  ')
   };
 }
@@ -436,6 +471,12 @@ function isArt(lines) {
     if (/\*{2,}/.test(l)) return true;             // a plotted curve
     if (/\|/.test(l) && /[.*]/.test(l) && /^[\s|.*]*$/.test(l)) return true;   // dotted construction
     if (/^\s*\^\s*$/.test(l)) return true;         // the tip of a drawn axis
+    // a caret with space on both sides points at the line above; an exponent
+    // always hugs its base
+    if (/(^|\s)\^(\s|$)/.test(l)) return true;
+    if (/\^{2,}/.test(l)) return true;              // a caret underline marking a span
+    // a staircase of symbols, as in an echelon form
+    if (/^[\s|]*(?:[*0][\s|]+){2,}[*0][\s|]*$/.test(l)) return true;
     if (/^\s*\/+\s*$/.test(l)) return true;        // a drawn slanted line
   }
   return false;
@@ -849,8 +890,12 @@ function renderBlock(code) {
 
   // A fenced block is one picture or one sheet of formulas, never a mixture of
   // both: splitting it would cut the connecting lines of a diagram.
-  // A panel is a box drawn AROUND formulas, so it still reads as a sheet.
-  if (unframe(lines)) return cardOrArt(lines);
+  // A panel is a box drawn AROUND formulas, so judge it by what it holds.
+  const inner = unframe(lines);
+  if (inner) {
+    return inner.some(isDrawnLine)
+      ? artBlock(prettyTree(lines) || lines) : cardOrArt(lines);
+  }
   if (lines.some(isDrawnLine)) return artBlock(prettyTree(lines) || lines);
   return cardOrArt(lines);
 }
@@ -954,13 +999,16 @@ function renderRows(input, raw) {
     // a +---+ run still on a line of text is decoration the parser could not
     // use; blank it rather than print it, keeping the columns the rest relies on
     const clean = line.replace(/\+[-=]{2,}\+/g, (m) => ' '.repeat(m.length));
+    // a leading asterisk is a bullet, not a multiplication sign
+    const bullet = /^\s*\*\s+\S/.test(clean);
+    const body = bullet ? clean.replace(/^(\s*)\*\s+/, '$1') : clean;
 
-    const { expr, note } = splitRow(clean);
+    const { expr, note } = splitRow(body);
     // a heading is all capitals with real words in it, and carries no note of its
     // own; "2 H2" is a formula, not a heading
     const caption = !note && !expr.includes('=') && !/[a-z]/.test(expr) &&
       (expr.match(/[A-Z]/g) || []).length >= 4;
-    rows.push({ expr: math(expr), note: note ? math(note) : '', caption });
+    rows.push({ expr: math(expr), note: note ? math(note) : '', caption, bullet });
     i++;
   }
 
@@ -995,7 +1043,8 @@ function renderRows(input, raw) {
     }
     // a prose line with no formula and no note reads better across both columns
     const wide = !r.note && !r.expr.includes('=') ? ' wide' : '';
-    return '<div class="expr' + wide + '">' + r.expr + '</div>' +
+    const mark = r.bullet ? '<span class="bul">\u2022</span>' : '';
+    return '<div class="expr' + wide + (r.bullet ? ' li' : '') + '">' + mark + r.expr + '</div>' +
            (wide ? '' : '<div class="note">' + (r.note || '') + '</div>');
   }).join('');
 
