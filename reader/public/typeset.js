@@ -608,13 +608,23 @@ function prettyTree(lines) {
     for (let c = 0; c < g[r].length; c++)
       if (g[r][c] === '|') g[r][c] = '│';
 
+  // a glyph counts as connected if it carries a stroke towards the scan
+  const DOWNWARD = '\u2502\u250c\u2510\u251c\u2524\u252c\u253c+\u25bc';
+  const UPWARD = '\u2502\u2514\u2518\u251c\u2524\u2534\u253c+\u25b2';
   const scan = (r, c, step) => {
+    const want = step < 0 ? DOWNWARD : UPWARD;
     for (let k = r + step; k >= 0 && k < g.length; k += step) {
       const d = at(k, c);
-      if (d === '│' || d === '+') return true;
+      if (want.includes(d)) return true;
       if (d !== ' ') return false;
     }
     return false;
+  };
+
+  const JOIN = {
+    UDLR: '\u253c', DLR: '\u252c', ULR: '\u2534', UDR: '\u251c', UDL: '\u2524',
+    DR: '\u250c', DL: '\u2510', UR: '\u2514', UL: '\u2518',
+    LR: '\u2500', UD: '\u2502', L: '\u2500', R: '\u2500', U: '\u2502', D: '\u2502'
   };
 
   for (let r = 0; r < g.length; r++) {
@@ -625,22 +635,15 @@ function prettyTree(lines) {
       // a sloping branch arrives at the corner just as a straight rail does
       const up = scan(r, c, -1) || at(r - 1, c - 1) === '\\' || at(r - 1, c + 1) === '/';
       const down = scan(r, c, 1) || at(r + 1, c - 1) === '/' || at(r + 1, c + 1) === '\\';
-      g[r][c] =
-        up && down && left && right ? '┼' :
-        down && left && right ? '┬' :
-        up && left && right ? '┴' :
-        down && right ? '┌' :
-        down && left ? '┐' :
-        up && right ? '└' :
-        up && left ? '┘' :
-        left && right ? '─' : '+';
+      const key = (up ? 'U' : '') + (down ? 'D' : '') + (left ? 'L' : '') + (right ? 'R' : '');
+      g[r][c] = JOIN[key] || '+';
     }
   }
 
   // long ASCII arrows, one glyph for one character so the columns hold
   for (let r = 0; r < g.length; r++) {
     const row = g[r].join('');
-    const re = /-{2,}>|<-{2,}/g;
+    const re = /-+>|<-+/g;
     let m;
     while ((m = re.exec(row)) !== null) {
       for (let k = m.index; k < m.index + m[0].length; k++) g[r][k] = '\u2500';
@@ -838,7 +841,7 @@ function renderBlock(code) {
   const lines = raw.split('\n');
 
   const table = asciiTable(lines);
-  if (table === AS_ART) return artBlock(lines);
+  if (table === AS_ART) return artBlock(prettyTree(lines) || lines);
   if (table) return table;
 
   const outline = outlineTree(lines);
