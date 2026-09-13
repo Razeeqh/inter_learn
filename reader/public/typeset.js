@@ -40,7 +40,9 @@ const OPS = [
 // "m x n", "n1 x u1", "2 x 3". Both sides must be short tokens so ordinary
 // prose such as "the x axis" is left alone.
 const MUL = [
-  [/\b([A-Za-z0-9]{1,3})\s+x\s+([A-Za-z0-9]{1,3})\b/g, '$1 × $2'],
+  // "m x n", "base x height": a times sign. Not when a joining word leads in or a
+  // verb follows, which is a sentence about the variable x ("and x is not 1").
+  [/(^|[\s(])(?!(?:and|or|if|then|when|where|but|so|that|which|while|since|each|every|any|all)\b)([A-Za-z0-9]{1,8})\s+x\s+(?!(?:is|are|was|were|be|been|being|not|must|can|cannot|will|would|should|does|do|did|lies|belongs|equals|gives|becomes|has|have|takes|goes)\b)([A-Za-z0-9]{1,8})\b/g, '$1$2 × $3'],
   [/\b(\d)x(\d)\b/g, '$1 × $2'],
   [/(\))\s+x\s+(?=[A-Za-z0-9(])/g, '$1 × ']
 ];
@@ -313,6 +315,11 @@ function renderMatrix(rows) {
          '<span class="mgrid">' + cells + '</span></span>';
 }
 
+/** A number line or sign line: dash runs carrying markers, with the values
+ *  written underneath. It has to stay monospace or the labels lose their place.
+ *  The marker may not be a bare dash, or every underline would match. */
+const NUMLINE = /-{3,}\s+[-+o*]\s+-{3,}|-{3,}[o*]-{3,}|-{2,}\s*\[[^\]]*\]\s*-{2,}/;
+
 /** One or more horizontal bars on a line, each with a numerator above and a
  *  denominator below, plus whatever joins them ("a/b + c/d + ... = e/f"). */
 function fractionAt(lines, i) {
@@ -320,6 +327,7 @@ function fractionAt(lines, i) {
   const prev = lines[i - 1];
   const next = lines[i + 1];
   if (prev === undefined || next === undefined) return null;
+  if (NUMLINE.test(cur)) return null;               // a drawn line, not a bar
   // A bar beside a matrix is that matrix's bracket, not a fraction line. Bars
   // that pair up around one term are absolute values, and those are allowed.
   const bracket = (l) => {
@@ -584,8 +592,13 @@ function artInline(line) {
 /** Redraw an indented +-- tree with box drawing glyphs, one char for one char
  *  so the column alignment the diagram depends on is preserved exactly. */
 function prettyTree(lines) {
-  if (!lines.some((l) => /\+-|-\+/.test(l))) return null;
-  if (lines.some((l) => /^\s*\+-+\+\s*$/.test(l))) return null;   // that is a box, not a tree
+  const spreader = lines.some((l, i) => {
+    const m = /-{3,}/.exec(l);
+    if (!m) return false;
+    const below = (lines[i + 1] || '').slice(m.index, m.index + m[0].length);
+    return (below.match(/\|/g) || []).length >= 2;
+  });
+  if (!spreader && !lines.some((l) => /\+-|-\+/.test(l))) return null;
 
   const g = lines.map((l) => l.split(''));
   const at = (r, c) => (g[r] && g[r][c]) || ' ';
@@ -609,8 +622,9 @@ function prettyTree(lines) {
       if (g[r][c] !== '+') continue;
       const left = at(r, c - 1) === '-';
       const right = at(r, c + 1) === '-';
-      const up = scan(r, c, -1);
-      const down = scan(r, c, 1);
+      // a sloping branch arrives at the corner just as a straight rail does
+      const up = scan(r, c, -1) || at(r - 1, c - 1) === '\\' || at(r - 1, c + 1) === '/';
+      const down = scan(r, c, 1) || at(r + 1, c - 1) === '/' || at(r + 1, c + 1) === '\\';
       g[r][c] =
         up && down && left && right ? '┼' :
         down && left && right ? '┬' :
@@ -620,6 +634,48 @@ function prettyTree(lines) {
         up && right ? '└' :
         up && left ? '┘' :
         left && right ? '─' : '+';
+    }
+  }
+
+  // long ASCII arrows, one glyph for one character so the columns hold
+  for (let r = 0; r < g.length; r++) {
+    const row = g[r].join('');
+    const re = /-{2,}>|<-{2,}/g;
+    let m;
+    while ((m = re.exec(row)) !== null) {
+      for (let k = m.index; k < m.index + m[0].length; k++) g[r][k] = '\u2500';
+      g[r][m[0][0] === '<' ? m.index : m.index + m[0].length - 1] =
+        m[0][0] === '<' ? '\u25c0' : '\u25b6';
+    }
+  }
+
+  // A spreader bar drawn with bare dashes, with the branches hanging off it.
+  // Without junctions it reads as a stray rule, so give it the joins it means.
+  for (let r = 0; r < g.length; r++) {
+    for (let c = 0; c < g[r].length; c++) {
+      if (g[r][c] !== '-') continue;
+      let e = c;
+      while (g[r][e] === '-') e++;
+      const span = e - c;
+      c = e - 1;
+      if (span < 3) continue;
+      const railsAt = (row) => {
+        const cols = [];
+        for (let k = e - span; k < e; k++) if (at(row, k) === '\u2502') cols.push(k);
+        return cols;
+      };
+      const below = railsAt(r + 1);
+      const above = railsAt(r - 1);
+      if (below.length + above.length < 2) continue;
+      const s = e - span;
+      for (let k = s; k < e; k++) g[r][k] = '\u2500';
+      for (const k of below) g[r][k] = above.includes(k) ? '\u253c' : '\u252c';
+      for (const k of above) if (!below.includes(k)) g[r][k] = '\u2534';
+      // square off the ends so the bar reads as one piece
+      if (g[r][s] === '\u252c') g[r][s] = '\u250c';
+      else if (g[r][s] === '\u2534') g[r][s] = '\u2514';
+      if (g[r][e - 1] === '\u252c') g[r][e - 1] = '\u2510';
+      else if (g[r][e - 1] === '\u2534') g[r][e - 1] = '\u2518';
     }
   }
 
@@ -636,12 +692,21 @@ function prettyTree(lines) {
     }
   }
 
+  // a lone v under a rail is the arrow head that rail is drawn with
+  for (let r = 1; r < g.length; r++) {
+    for (let c = 0; c < g[r].length; c++) {
+      if (g[r][c] !== 'v' && g[r][c] !== 'V') continue;
+      if (at(r, c - 1).trim() || at(r, c + 1).trim()) continue;
+      if (at(r - 1, c) === '\u2502') g[r][c] = '\u25bc';
+    }
+  }
+
   // where a rail runs out into the next label, point at it
   for (let r = 0; r < g.length; r++) {
     for (let c = 0; c < g[r].length; c++) {
       if (g[r][c] !== '\u2502') continue;
       const below = at(r + 1, c);
-      if (BOX.includes(below) || below === '+') continue;
+      if (BOX.includes(below) || below === '+' || below === '\u25bc') continue;
       if ((g[r + 1] || []).join('').trim()) g[r][c] = '\u25bc';
     }
   }
@@ -814,6 +879,22 @@ function renderRows(input, raw) {
       continue;
     }
 
+    // a drawn number line, with the values that sit under it
+    if (NUMLINE.test(line)) {
+      const grp = [line.replace(/\s+$/, '')];
+      while (i + 1 < lines.length && lines[i + 1].trim() &&
+             !/[=<>]/.test(lines[i + 1]) && lines[i + 1].trim().length <= 40) {
+        grp.push(lines[++i].replace(/\s+$/, ''));
+      }
+      sawStructure = true;
+      rows.push({
+        expr: grp.map((l) => artInline(esc(l))).join('\n'),
+        aligned: true, numline: true
+      });
+      i++;
+      continue;
+    }
+
     const bar = barMatrixAt(lines, i);
     if (bar) {
       sawStructure = true;
@@ -905,7 +986,10 @@ function renderRows(input, raw) {
     if (r.gap) return '<div class="spacer"></div>';
     if (r.divider) return '<div class="fdiv"></div>';
     if (r.caption) return '<div class="cap">' + r.expr + '</div>';
-    if (r.aligned) return '<div class="expr wide algn">' + r.expr + '</div>';
+    if (r.aligned) {
+      return '<div class="expr wide algn' + (r.numline ? ' numline' : '') + '">' +
+             r.expr + '</div>';
+    }
     // a prose line with no formula and no note reads better across both columns
     const wide = !r.note && !r.expr.includes('=') ? ' wide' : '';
     return '<div class="expr' + wide + '">' + r.expr + '</div>' +

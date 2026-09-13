@@ -243,10 +243,11 @@ function expr(src, fail) {
   s = calls(s, fail);
   s = scripts(s, fail);
   s = s.replace(/\b([A-Za-z])(\d{1,2})(?![\d}_])/g, '$1_{$2}');   // x1, a11
-  // "m x n", "2 x 3"; twice, as the first pass eats the middle operand
+  // "m x n", "base x height"; twice, as the first pass eats the middle operand.
+  // A joining word before, or a verb after, means x is the variable.
   for (let pass = 0; pass < 2; pass++) {
-    s = s.replace(/\b([A-Za-z0-9]{1,3})\s+x\s+([A-Za-z0-9]{1,3})\b/g,
-      (_, a, b) => a + ' ' + hold('\\times') + ' ' + b);
+    s = s.replace(/(^|[\s(])(?!(?:and|or|if|then|when|where|but|so|that|which|while|since|each|every|any|all)\b)([A-Za-z0-9]{1,8})\s+x\s+(?!(?:is|are|was|were|be|been|being|not|must|can|cannot|will|would|should|does|do|did|lies|belongs|equals|gives|becomes|has|have|takes|goes)\b)([A-Za-z0-9]{1,8})\b/g,
+      (_, lead, a, b) => lead + a + ' ' + hold('\\times') + ' ' + b);
   }
   s = s.replace(/\b(\d)x(\d)\b/g, (_, a, b) => a + hold('\\times') + b);
   s = words(s);

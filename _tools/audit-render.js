@@ -32,6 +32,8 @@ const issues = {
   rawCaret: { desc: 'caret or sqrt( survived into prose output', hits: [] },
   rawSymbol: { desc: 'greek name, arrow or relation left as plain text', hits: [] },
   artSymbol: { desc: 'greek name left as a word inside a diagram', hits: [] },
+  brokenJoin: { desc: 'connector in a diagram that joins nothing', hits: [] },
+  falseTimes: { desc: 'a variable x turned into a multiplication sign', hits: [] },
   proseMath: { desc: 'a sentence set as algebra (italic, mashed words)', hits: [] },
   mixedFont: { desc: 'monospace and typeset rows inside one card', hits: [] },
   wideArt: { desc: 'diagram wider than 100 columns (will scroll on phones)', hits: [] }
@@ -89,6 +91,10 @@ for (const file of files) {
         if (widest > 100) issues.wideArt.hits.push({ rel, line: start, code: `${widest} columns` });
         const drawn = html.replace(/<[^>]+>/g, ' ');
         if (GREEK_WORDS.test(drawn)) issues.artSymbol.hits.push({ rel, line: start, code });
+        // a junction prettyTree could not read: the rails it joins do not line up
+        if (/\+[-\u2500]|[-\u2500]\+/.test(drawn)) {
+          issues.brokenJoin.hits.push({ rel, line: start, code });
+        }
       } else {
         // a sentence pushed through LaTeX: italic letters with the spaces eaten
         for (const m of html.matchAll(/<annotation encoding="application\/x-tex">([\s\S]*?)<\/annotation>/g)) {
@@ -118,6 +124,13 @@ for (const file of files) {
         // shown to the reader, so neither counts as output
         const shown = cards.replace(/<span class="katex-mathml">[\s\S]*?<\/span><span class="katex-html"/g, '<span class="katex-html"');
         const text = shown.replace(/<[^>]+>/g, ' ');
+        // a times sign followed by a verb was really the variable x
+        if (/\u00d7\s+(is|are|was|were|be|not|must|can|cannot|will|would|does|has|have|lies|belongs)\b/.test(text) ||
+            /\b(and|or|if|then|when|where)\s+\u00d7/.test(text)) {
+          issues.falseTimes.hits.push({
+            rel, line: start, code: text.replace(/\s+/g, ' ').slice(0, 120)
+          });
+        }
         if (/\+--|--\+/.test(text)) {
           issues.boxLeak.hits.push({
             rel, line: start,

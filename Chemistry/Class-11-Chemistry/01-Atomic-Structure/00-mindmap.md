@@ -42,21 +42,23 @@
 ```
   THE TWO DISCOVERY EXPERIMENTS THAT SIT UNDER PART 1
 
-     CATHODE RAY TUBE  (Thomson)          OIL DROP  (Millikan)
-            |                                    |
-     6 properties of                        q E  =  m g
-     cathode rays                                |
-            |                              q = n e , so charge
-     nature is independent of              is QUANTISED
-     the gas and the electrode                   |
-            |                              e = 1.602 x 10^-19 C
-     -> the ELECTRON exists                      |
-        in ALL matter                            |
-            |                                    |
-     e/m = 1.758 x 10^11 C/kg  ---------+--------+
-                                        |
-                                        v
-                        mass of electron = 9.11 x 10^-31 kg
+     CATHODE RAY TUBE  (Thomson)              OIL DROP  (Millikan)
+            |                                          |
+     6 properties of                            q E  =  m g
+     cathode rays                                      |
+            |                                  q = n e , so charge
+     nature is independent of                  is QUANTISED
+     the gas and the electrode                        |
+            |                                  e = 1.602 x 10^-19 C
+     -> the ELECTRON exists                           |
+        in ALL matter                                 |
+            |                                         |
+     e/m = 1.758 x 10^11 C/kg                         |
+            |                                         |
+            +--------------------+--------------------+
+                                 |
+                                 v
+                  mass of electron = 9.11 x 10^-31 kg
 ```
 
 ---
