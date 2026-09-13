@@ -31,7 +31,7 @@ const OPS = [
   [/=\/=/g, '≠'], [/!=/g, '≠'], [/~=/g, '≈'],
   [/\+\/-/g, '±'], [/\+-(?![-\w])/g, '±'],
   [/\.\.\./g, '…'],
-  [/(\S)\s\*\s(?=\S)/g, '$1 · '],
+  [/(\S)\s\*(\s|$)/g, '$1 ·$2'],
   [/\bINT\b/g, '∫'], [/\bSUM\b/g, '∑'],
   [/\binf(inity)?\b/g, '∞'],
   [/\bangstrom\b/g, 'Å'],
@@ -411,22 +411,40 @@ function fractionAt(lines, i) {
   }
 
   // whatever sits between two bars is the operator joining the fractions
+  // Text sitting on the bar line before each bar, and after the last one.
+  // "sqrt( ---- )" is drawn with the root here and its bracket closing after
+  // the bar, so the root has to be put back around the fraction it covers.
+  const before = runs.map((r, k) =>
+    k === 0 ? [label, cur.slice(0, first)].filter(Boolean).join(' ') : cur.slice(runs[k - 1][1], r[0]));
+  let tail = [cur.slice(tailEnd), prev.slice(tailEnd), next.slice(tailEnd)]
+    .map(dropFrames).filter(Boolean).join('  ');
+
+  const pieces = parts.map((p, k) => {
+    const root = /\bsqrt\s*\(\s*$/.exec(before[k]);
+    const following = k + 1 < runs.length ? before[k + 1] : tail;
+    if (!root || !/^\s*\)/.test(following)) return p;
+    before[k] = before[k].slice(0, root.index);
+    if (k + 1 < runs.length) before[k + 1] = following.replace(/^\s*\)/, '');
+    else tail = following.replace(/^\s*\)/, '').trim();
+    return '<span class="sqrt">\u221a<span class="rad">' + p + '</span></span>';
+  });
+
+  const rooted = pieces.some((p, k) => p !== parts[k]);
   let html = '';
-  for (let k = 0; k < parts.length; k++) {
-    if (k) {
-      const gap = [cur.slice(runs[k - 1][1], runs[k][0]), seg(prev, runs[k - 1][1], runs[k][0])]
-        .map((t) => t.trim()).filter(Boolean).join(' ');
-      html += gap ? ' ' + typesetInline(gap) + ' ' : ' ';
-    }
-    html += parts[k];
+  for (let k = 0; k < pieces.length; k++) {
+    const join = [before[k], k === 0 ? '' : seg(prev, runs[k - 1][1], runs[k][0])]
+      .map((t) => (t || '').trim()).filter(Boolean).join(' ');
+    if (join) html += (k ? ' ' : '') + typesetInline(join) + ' ';
+    else if (k) html += ' ';
+    html += pieces[k];
   }
 
-  const lead = [label, cur.slice(0, first).trim()].filter(Boolean).join(' ');
   return {
-    html: runs.length === 1
-      ? fracRow(lead, seg(prev, spans[0][0], spans[0][1]), seg(next, dspans[0][0], dspans[0][1]))
-      : (lead ? typesetInline(lead) + ' ' : '') + html,    rhs: [cur.slice(tailEnd), prev.slice(tailEnd), next.slice(tailEnd)]
-      .map(dropFrames).filter(Boolean).join('  ')
+    html: (runs.length === 1 && !rooted)
+      ? fracRow(before[0].trim(), seg(prev, spans[0][0], spans[0][1]),
+        seg(next, dspans[0][0], dspans[0][1]))
+      : html,
+    rhs: tail
   };
 }
 
@@ -470,6 +488,10 @@ function isArt(lines) {
     if (/\+-{2,}/.test(l) && />\s*[A-Za-z]?\s*$/.test(l)) return true;   // axis with points on it
     if (/\*{2,}/.test(l)) return true;             // a plotted curve
     if (/\|/.test(l) && /[.*]/.test(l) && /^[\s|.*]*$/.test(l)) return true;   // dotted construction
+    // a curve plotted with dots and quote marks, as in a circle diagram. A
+    // derivative's prime hugs its symbol, so f'(x) is not caught here.
+    if ((l.match(/(?:^|\s)'|'(?:\s|$)/g) || []).length >= 2 &&
+        /(?:^|\s)[.*](?:\s|$)/.test(l)) return true;
     if (/^\s*\^\s*$/.test(l)) return true;         // the tip of a drawn axis
     // a caret with space on both sides points at the line above; an exponent
     // always hugs its base
@@ -547,7 +569,8 @@ function asciiTable(lines) {
   const bodyHtml = rest.map((g) =>
     g.map((r) => '<tr>' + r.map((c) => cell(c, 'td')).join('') + '</tr>').join('')).join('');
 
-  const note = (ls) => ls.map((l) => '<p class="tnote">' + typesetInline(l.trim()) + '</p>').join('');
+  // the sentences around the table are wrapped source lines, not one line each
+  const note = (ls) => (ls.length ? proseBlock(ls) : '');
   return '<div class="tablewrap">' + note(lead) +
          '<table>' + head + '<tbody>' + bodyHtml + '</tbody></table>' + note(tail) + '</div>';
 }
@@ -838,16 +861,40 @@ function artBlock(lines) {
 
 /** Sentences that happened to be fenced: set them as prose, not as code. */
 function proseBlock(lines) {
-  const paras = [];
-  let cur = [];
+  const out = [];
+  let para = [];
+  let items = [];
+  const flushPara = () => {
+    if (para.length) out.push('<p>' + typesetInline(para.join(' ')) + '</p>');
+    para = [];
+  };
+  const flushList = () => {
+    if (items.length) out.push('<ul>' + items.map((t) => '<li>' + typesetInline(t) + '</li>').join('') + '</ul>');
+    items = [];
+  };
+
   for (const l of lines) {
-    if (l.trim()) cur.push(l.trim());
-    else if (cur.length) { paras.push(cur.join(' ')); cur = []; }
+    const bullet = /^\s*[*\u2022]\s+\S/.exec(l);
+    if (bullet) { flushPara(); items.push(l.replace(/^\s*[*\u2022]\s+/, '')); continue; }
+    if (!l.trim()) { flushPara(); flushList(); continue; }
+    // a wrapped continuation of the bullet above it
+    if (items.length && /^\s{4,}\S/.test(l)) { items[items.length - 1] += ' ' + l.trim(); continue; }
+    flushList();
+    const t = l.trim();
+    // a heading, or a line that is lined up or carries a formula, stands alone;
+    // only wrapped sentences are joined back together
+    const alone = !/[a-z]/.test(t) || /[=:]\s|\S\s{3,}\S/.test(t);
+    if (alone) {
+      flushPara();
+      out.push('<p class="' + (/[a-z]/.test(t) ? 'tnote' : 'phead') + '">' +
+        typesetInline(t) + '</p>');
+      continue;
+    }
+    para.push(t);
   }
-  if (cur.length) paras.push(cur.join(' '));
-  if (!paras.length) return '';
-  return '<div class="proseblock">' +
-    paras.map((p) => '<p>' + typesetInline(p) + '</p>').join('') + '</div>';
+  flushPara();
+  flushList();
+  return out.length ? '<div class="proseblock">' + out.join('') + '</div>' : '';
 }
 
 /** Is this single line part of a drawing? Same tests as isArt, one line at a time. */

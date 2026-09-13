@@ -25,7 +25,8 @@ const CASES = [
   ['s = - b +- sqrt( b^2 - 4 a c )', { has: '\u221a', hasNot: 'sqrt' }],
   ['true for all n in N (r =/= 1)', { has: '\u2260', hasNot: '=/=' }],
   ['P_before = P_after', { hasNot: '_' }],
-  ['the interval ( -inf , -5 ]', { has: '\u221e', hasNot: 'inf' }]
+  ['the interval ( -inf , -5 ]', { has: '\u221e', hasNot: 'inf' }],
+  ['y^2 = b^2 * b^2', { has: '\u00b7', hasNot: '*' }]
 ];
 
 let bad = 0;
