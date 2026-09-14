@@ -82,14 +82,16 @@ function supBrackets(s) {
   let out = '';
   let rest = s;
   for (let guard = 0; guard < 200; guard++) {
-    const m = /\^\s*(-?)\(/.exec(rest);
+    const m = /\^\s*(-?)([([])/.exec(rest);
     if (!m) break;
+    const open = m[2];
+    const shut = open === '(' ? ')' : ']';
     const start = m.index + m[0].length;
     let depth = 1;
     let i = start;
     for (; i < rest.length && depth; i++) {
-      if (rest[i] === '(') depth++;
-      else if (rest[i] === ')') depth--;
+      if (rest[i] === open) depth++;
+      else if (rest[i] === shut) depth--;
     }
     if (depth) break;
     out += rest.slice(0, m.index) + '<sup>' + m[1] + rest.slice(start, i - 1) + '</sup>';
@@ -420,13 +422,15 @@ function fractionAt(lines, i) {
     .map(dropFrames).filter(Boolean).join('  ');
 
   const pieces = parts.map((p, k) => {
-    const root = /\bsqrt\s*\(\s*$/.exec(before[k]);
+    const root = /(\bsqrt\s*\(|\^\s*\()\s*$/.exec(before[k]);
     const following = k + 1 < runs.length ? before[k + 1] : tail;
     if (!root || !/^\s*\)/.test(following)) return p;
     before[k] = before[k].slice(0, root.index);
     if (k + 1 < runs.length) before[k + 1] = following.replace(/^\s*\)/, '');
     else tail = following.replace(/^\s*\)/, '').trim();
-    return '<span class="sqrt">\u221a<span class="rad">' + p + '</span></span>';
+    return root[1].indexOf('^') === 0
+      ? '<sup>' + p + '</sup>'
+      : '<span class="sqrt">\u221a<span class="rad">' + p + '</span></span>';
   });
 
   const rooted = pieces.some((p, k) => p !== parts[k]);
@@ -494,8 +498,9 @@ function isArt(lines) {
         /(?:^|\s)[.*](?:\s|$)/.test(l)) return true;
     if (/^\s*\^\s*$/.test(l)) return true;         // the tip of a drawn axis
     // a caret with space on both sides points at the line above; an exponent
-    // always hugs its base
-    if (/(^|\s)\^(\s|$)/.test(l)) return true;
+    // always hugs its base, so a caret left hanging means the exponent is
+    // written on a different line and only the columns hold the formula together
+    if (/\^(\s|$)/.test(l)) return true;
     if (/\^{2,}/.test(l)) return true;              // a caret underline marking a span
     // a staircase of symbols, as in an echelon form
     if (/^[\s|]*(?:[*0][\s|]+){2,}[*0][\s|]*$/.test(l)) return true;

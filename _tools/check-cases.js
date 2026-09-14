@@ -26,7 +26,9 @@ const CASES = [
   ['true for all n in N (r =/= 1)', { has: '\u2260', hasNot: '=/=' }],
   ['P_before = P_after', { hasNot: '_' }],
   ['the interval ( -inf , -5 ]', { has: '\u221e', hasNot: 'inf' }],
-  ['y^2 = b^2 * b^2', { has: '\u00b7', hasNot: '*' }]
+  ['y^2 = b^2 * b^2', { has: '\u00b7', hasNot: '*' }],
+  ['d = sqrt((x2-x1)^2 + (y2-y1)^2)', { has: '\u221a', hasNot: 'sqrt' }],
+  ['area = x^[n] + 1', { hasNot: '^' }]
 ];
 
 let bad = 0;
