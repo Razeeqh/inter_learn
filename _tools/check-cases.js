@@ -47,7 +47,13 @@ const BLOCKS = [
     (h) => h.includes('\u250c') && h.includes('\u2518')],
   ['spreader gets junctions',
     '        |\n   ---------\n   |   |   |\n   a   b   c\n',
-    (h) => h.includes('\u252c') || h.includes('\u253c')]
+    (h) => h.includes('\u252c') || h.includes('\u253c')],
+  ['a pair of fractions is not a number line',
+    '       x^2      y^2\n      -----  -  -----  =  1\n       a^2      b^2\n',
+    (h) => /class="frac"|katex/.test(h) && !/numline/.test(h) && /a<sup>2|a2/.test(h.replace(/<[^>]+>/g, (t) => t))],
+  ['a single bar still makes a fraction',
+    '                1\n   f(x)  =  --------------\n             6x - x^2 - 5\n',
+    (h) => /class="frac"|katex/.test(h) && !/numline/.test(h)]
 ];
 
 for (const [name, src, ok] of BLOCKS) {

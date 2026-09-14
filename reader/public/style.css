@@ -338,7 +338,11 @@ a:hover { text-decoration: underline; }
 .fsheet .bul { color: var(--accent); margin-right: .55em; }
 .fsheet .note {
   font-family: var(--sans); font-size: 13.5px; color: var(--dim); line-height: 1.55;
+  min-width: 0; overflow-x: auto;
 }
+/* KaTeX sets one unbreakable box; let a wordy note wrap instead of being cut */
+.fsheet .note .katex, .fsheet .expr .katex { white-space: normal; }
+.fsheet .note .katex .mord.text, .fsheet .expr .katex .mord.text { white-space: normal; }
 .fsheet .cap {
   grid-column: 1 / -1; font-family: var(--sans); font-size: 13px; font-weight: 700;
   letter-spacing: .06em; text-transform: uppercase; color: var(--accent); text-align: left;
@@ -403,6 +407,10 @@ pre.art {
 @supports (container-type: inline-size) {
   .doc { container-type: inline-size; }
   pre.art { font-size: max(11px, min(var(--mono), calc((100cqw - 52px) / (var(--cols, 60) * 0.605)))); }
+  /* an inset table shrinks to fit the card rather than hiding its right edge */
+  .fsheet .expr.algn {
+    font-size: max(10px, min(.78em, calc((100cqw - 110px) / (var(--cols, 40) * 0.605))));
+  }
 }
 
 /* ---------------- tables ---------------- */

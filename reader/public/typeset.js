@@ -215,6 +215,9 @@ function typesetInline(raw) {
 
 const pad = (l, n) => (l.length >= n ? l : l + ' '.repeat(n - l.length));
 
+/** Widest line in a group, so a monospace block can be scaled to fit. */
+const widest = (ls) => ls.reduce((n, l) => Math.max(n, l.length), 0);
+
 /** Border runs that belong to a neighbouring box, not to this text. */
 const dropFrames = (t) => t.replace(/\+[-=]{2,}\+/g, ' ').replace(/\s{2,}/g, ' ').trim();
 
@@ -329,8 +332,9 @@ function renderMatrix(rows) {
 
 /** A number line or sign line: dash runs carrying markers, with the values
  *  written underneath. It has to stay monospace or the labels lose their place.
- *  The marker may not be a bare dash, or every underline would match. */
-const NUMLINE = /-{3,}\s+[-+o*]\s+-{3,}|-{3,}[o*]-{3,}|-{2,}\s*\[[^\]]*\]\s*-{2,}/;
+ *  Three runs are needed for the spaced form, or "--- - ---" would swallow a
+ *  pair of fractions written side by side. */
+const NUMLINE = /-{3,}\s*\[[^\]]*\]\s*-{3,}|-{3,}[o*]-{3,}|(?:-{3,}(?:\s+[-+o*]\s+|[o*])){2,}-{3,}/;
 
 /** One or more horizontal bars on a line, each with a numerator above and a
  *  denominator below, plus whatever joins them ("a/b + c/d + ... = e/f"). */
@@ -989,7 +993,7 @@ function renderRows(input, raw) {
       sawStructure = true;
       rows.push({
         expr: grp.map((l) => artInline(esc(l))).join('\n'),
-        aligned: true, numline: true
+        aligned: true, numline: true, cols: widest(grp)
       });
       i++;
       continue;
@@ -1031,7 +1035,7 @@ function renderRows(input, raw) {
           .replace(/\s+$/, ''));
         i++;
       }
-      rows.push({ expr: typesetInline(grp.join('\n')), aligned: true });
+      rows.push({ expr: typesetInline(grp.join('\n')), aligned: true, cols: widest(grp) });
       continue;
     }
 
@@ -1039,7 +1043,10 @@ function renderRows(input, raw) {
     // drawn rather than printing the bar as a row of dashes
     if (/^[\s\-,()]*-{3,}[\s\-,()]*$/.test(lines[i + 1] || '')) {
       const grp = [lines[i], lines[i + 1], lines[i + 2]].filter((l) => l !== undefined);
-      rows.push({ expr: typesetInline(grp.join('\n').replace(/\s+$/, '')), aligned: true });
+      rows.push({
+        expr: typesetInline(grp.join('\n').replace(/\s+$/, '')),
+        aligned: true, cols: widest(grp)
+      });
       i += 3;
       continue;
     }
@@ -1060,7 +1067,10 @@ function renderRows(input, raw) {
     // own; "2 H2" is a formula, not a heading
     const caption = !note && !expr.includes('=') && !/[a-z]/.test(expr) &&
       (expr.match(/[A-Z]/g) || []).length >= 4;
-    rows.push({ expr: math(expr), note: note ? math(note) : '', caption, bullet });
+    rows.push({
+      expr: math(expr), note: note ? math(note) : '', caption, bullet,
+      long: expr.length > 46
+    });
     i++;
   }
 
@@ -1090,11 +1100,12 @@ function renderRows(input, raw) {
     if (r.divider) return '<div class="fdiv"></div>';
     if (r.caption) return '<div class="cap">' + r.expr + '</div>';
     if (r.aligned) {
-      return '<div class="expr wide algn' + (r.numline ? ' numline' : '') + '">' +
-             r.expr + '</div>';
+      return '<div class="expr wide algn' + (r.numline ? ' numline' : '') +
+             '" style="--cols:' + (r.cols || 40) + '">' + r.expr + '</div>';
     }
-    // a prose line with no formula and no note reads better across both columns
-    const wide = !r.note && !r.expr.includes('=') ? ' wide' : '';
+    // a prose line with no formula, or a formula too long for one column,
+    // reads better across the whole card
+    const wide = !r.note && (r.long || !r.expr.includes('=')) ? ' wide' : '';
     const mark = r.bullet ? '<span class="bul">\u2022</span>' : '';
     return '<div class="expr' + wide + (r.bullet ? ' li' : '') + '">' + mark + r.expr + '</div>' +
            (wide ? '' : '<div class="note">' + (r.note || '') + '</div>');

@@ -315,7 +315,13 @@ function toTeX(src, loose) {
     .join(' ');
   if (fail.hit) return null;
   const tex = expand(out).replace(/\s+/g, ' ').trim();
-  return /[^\s]/.test(tex) ? tex : null;
+  if (!/[^\s]/.test(tex)) return null;
+  // If most of what came out is set as text, the line was a sentence carrying a
+  // symbol or two. KaTeX cannot wrap, so leaving it to the HTML typesetter keeps
+  // it readable instead of clipping it at the edge of its column.
+  const words = (tex.match(/\\text\{[^{}]*\}/g) || []).join('').length;
+  if (words > tex.length * 0.5) return null;
+  return tex;
 }
 
 /** Which guard stopped this expression, for the audit. */
